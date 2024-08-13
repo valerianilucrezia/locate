@@ -7,7 +7,6 @@ A set of utils function to run automatically an enetire inference cycle, plottin
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
-from locate.inference import *
 import numpy as np
 from pyro.optim import ClippedAdam
 from pyro.infer import SVI, TraceGraph_ELBO
