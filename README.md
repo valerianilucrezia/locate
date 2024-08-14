@@ -1,6 +1,6 @@
 # locate
 
-A package for..
+A package for segmenting long-reads sequencing data and inferring copy number states.
 
 ## Installation
 

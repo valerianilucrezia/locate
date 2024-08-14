@@ -12,8 +12,31 @@ from pyro.optim import ClippedAdam
 from pyro.infer import SVI, TraceGraph_ELBO
 import torch
 from pandas.core.common import flatten
+import pyro
 
 def plot_loss(loss, save = False, output = "run1"):
+    """Plot loss function.
+
+    Parameters
+    ----------
+    loss : np.array
+        The loss.
+    save : bool, optional
+        Boolean specifyng if the plot as to be saves.
+    output : string, optional
+        Where to save the plot.
+
+    Returns
+    -------
+    matplotpib
+        Plot.
+
+    Examples
+    --------
+    >>> plot_loss(loss)
+    """
+    
+    
     plt.plot(loss)
     plt.title("ELBO")
     plt.xlabel("step")
