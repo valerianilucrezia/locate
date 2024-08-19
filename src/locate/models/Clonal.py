@@ -20,6 +20,13 @@ from pyro.util import ignore_jit_warnings
 # It is actually more of a dictionary generator than a proper dictionary
 
 class SqueezableDict(dict):
+    """_summary_
+
+    Parameters
+    ----------
+    dict : _type_
+        _description_
+    """
     
     def __init__(self, *args, **kwargs):
         super(SqueezableDict, self).__init__(*args, **kwargs)
@@ -33,8 +40,18 @@ class SqueezableDict(dict):
 
 
 class Clonal(Model):
-    # parameters of the HMM + other stuff specific to CNA calling
+    """_summary_
 
+    Parameters
+    ----------
+    Model : _type_
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
     params = {'jumping_prob' : 1e-2,                                              
               'init_probs': torch.tensor([0.1, 0.1, 0.1, 0.1, 0.1]), 
               'hidden_dim': 3, 
@@ -59,6 +76,14 @@ class Clonal(Model):
         self._data = SqueezableDict({k:v for k,v in self._data.items()})
             
     def model(self, i = 1,  *args, **kwargs):
+        """_summary_
+
+        Parameters
+        ----------
+        i : int, optional
+            _description_, by default 1
+        """
+        
         n_sequences, length = 0, 0
         tot = 0
         
@@ -144,6 +169,14 @@ class Clonal(Model):
         return AutoDelta(poutine.block(self.model, hide_fn=lambda msg: msg["name"].startswith("x")))
 
     def get_Major_minor(self):
+        """_summary_
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+        
         combinations = list(itertools.combinations_with_replacement(range( self._params["hidden_dim"]), 2))[1:]
         
         major_alleles = [max(combination) for combination in combinations]
@@ -162,6 +195,18 @@ class Clonal(Model):
     @infer_discrete(first_available_dim = -2, temperature=0)
     @config_enumerate
     def model_2(self, learned_params):
+        """_summary_
+
+        Parameters
+        ----------
+        learned_params : _type_
+            _description_
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
         
         n_sequences, length = 0, 0
         minor, Major = None, None
@@ -234,6 +279,25 @@ class Clonal(Model):
         
         
 def get_clonal_peaks(tot, Major, minor, purity):
+    """_summary_
+
+    Parameters
+    ----------
+    tot : _type_
+        _description_
+    Major : _type_
+        _description_
+    minor : _type_
+        _description_
+    purity : _type_
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    
     if Major.dim() == 0:
         Major = Major.unsqueeze(0).unsqueeze(1)
         minor = minor.unsqueeze(0).unsqueeze(1)

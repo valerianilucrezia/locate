@@ -7,19 +7,13 @@ from pyro import poutine
 from tqdm import trange
 
 from locate.likelihoods import ClonalLikelihood
-from locate.likelihoods.utils_likelihood import export_switch
-from locate.model_selection import *
 from locate.utils import retrieve_params
 from locate.stopping_criteria import all_stopping_criteria
-
+from locate.likelihoods.utils_likelihood import export_switch
 
 
 class LOCATE:
-    """ 
-    The interface class
-    
-    Basically it takes a model, an optimizer and a loss function and provides a functions to run the inference and get the parameters
-    back masking the differences between models.
+    """_summary_
     """
     
     def __init__(self, model = None, optimizer = None, loss = None, inf_type = SVI, CUDA = False):
@@ -43,7 +37,6 @@ class LOCATE:
 
 
     def __repr__(self):
-
         if self._model is None:
             dictionary = {"Model": self._model_fun,
                     "Optimizer": self._optimizer,
@@ -62,26 +55,65 @@ class LOCATE:
         return "\n".join("{}:\t{}".format(k, v) for k, v in dictionary.items())
 
     def initialize_model(self, data):
+        """_summary_
+
+        Parameters
+        ----------
+        data : _type_
+            _description_
+        """
+        
         assert self._model_fun is not None
         self._model = self._model_fun(data)
         self._model_string = type(self._model).__name__
 
     def set_optimizer(self, optimizer):
+        """_summary_
+
+        Parameters
+        ----------
+        optimizer : _type_
+            _description_
+        """
+        
         self._optimizer = optimizer
 
     def set_model(self, model):
+        """_summary_
+
+        Parameters
+        ----------
+        model : _type_
+            _description_
+        """
+        
         self._model_fun = model
 
     def set_loss(self, loss):
+        """_summary_
+
+        Parameters
+        ----------
+        loss : _type_
+            _description_
+        """
+        
         self._loss = loss
 
     def set_model_params(self, param_dict):
+        """_summary_
+
+        Parameters
+        ----------
+        param_dict : _type_
+            _description_
+        """
+        
         if self._CUDA:
             param_dict['CUDA'] = True
         self._model.set_params(param_dict)
 
     def run(self, steps,param_optimizer = {'lr' : 0.05}, e = 0.01, patience = 5, param_loss = None, seed = 3):
-
         """ This function runs the inference of non-categorical parameters
 
           This function performs a complete inference cycle for the given tuple(model, optimizer, loss, inference modality).
@@ -103,16 +135,13 @@ class LOCATE:
 
           Returns:
               list: loss (divided by sample size) for each step
-
-
           """
 
         pyro.set_rng_seed(seed)
         pyro.clear_param_store()
 
-        expose_vec = export_switch(self._model)
         model = self._model.model
-        guide = self._model.guide(expose_vec)
+        guide = self._model.guide(None)
 
         optim = self._optimizer(param_optimizer)
         elbo = self._loss(**param_loss) if param_loss is not None else self._loss()
@@ -162,25 +191,21 @@ class LOCATE:
         self._guide_trained = guide
         self._loss_trained = loss
         print("Done!", flush=True)
+        
         return loss, num_observations
 
 
     def learned_parameters_Clonal(self):
-        """ Return all the estimated  parameter values
-            Calls the right set of function for retrieving learned parameters according to the model type
+        """_summary_
 
-            Args:
-              posterior: learn posterior assignement (if false estimate MAP via Viterbi-like MAP inference)
-              
-            Returns:
-              dict: parameter:value dictionary
+        Returns
+        -------
+        _type_
+            _description_
         """
 
-
         params = self._guide_trained()
-        
         map_states =  self._model.model_2(self._model, learned_params = params)
-        print(map_states)
         
         if self._model._params["allele_specific"]:
             discrete_params = {"CN_Major" : self._model._params["Major"][torch.tensor(map_states)[1:].long()], 
@@ -196,27 +221,20 @@ class LOCATE:
             discrete_params = {i : discrete_params[i].detach().numpy() for i in discrete_params}
 
         all_params =  {**trained_params_dict,**discrete_params}
-
         return all_params
 
 
-
     def learned_parameters_SubClonal(self):
-        """ Return all the estimated  parameter values
-            Calls the right set of function for retrieving learned parameters according to the model type
+        """_summary_
 
-            Args:
-              posterior: learn posterior assignement (if false estimate MAP via Viterbi-like MAP inference)
-              
-            Returns:
-              dict: parameter:value dictionary
+        Returns
+        -------
+        _type_
+            _description_
         """
 
-
         params = self._guide_trained()
-        
         map_states =  self._model.model_2(self._model, learned_params = params)
-        print(map_states)
         
         if self._model._params["allele_specific"]:
             discrete_params = {"CN_Major" : self._model._params["Major"][torch.tensor(map_states)[1:].long()], 

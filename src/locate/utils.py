@@ -1,4 +1,4 @@
-""" Utils class
+""" Utils
 
 A set of utils function to run automatically an enetire inference cycle, plotting and saving results.
 
@@ -36,7 +36,6 @@ def plot_loss(loss, save = False, output = "run1"):
     >>> plot_loss(loss)
     """
     
-    
     plt.plot(loss)
     plt.title("ELBO")
     plt.xlabel("step")
@@ -45,34 +44,57 @@ def plot_loss(loss, save = False, output = "run1"):
         plt.savefig(output + "_ELBO.png")
 
 def collect_params(pars):
+    """_summary_
+
+    Parameters
+    ----------
+    pars : _type_
+        _description_
+    """
+    
     pars = list(flatten([value.detach().tolist() for key, value in pars.items()]))
     return(np.array(pars))
 
 def retrieve_params():
+    """_summary_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    
     param_names = pyro.get_param_store()
     res = {nms: pyro.param(nms) for nms in param_names}
     return res
+
+
 
 from scipy.signal import find_peaks
 from scipy.stats import gaussian_kde
 
 def filter_tail_vaf(vaf):
+    """_summary_
+
+    Parameters
+    ----------
+    vaf : _type_
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    
     x = (vaf/dp).squeeze(1)
     
     # kernel adjust the data
     kernel_adjust = 1.0  
     bandwidth = 'scott'  
     kde = gaussian_kde(x, bw_method=bandwidth)
-    # x = np.linspace(min(x), max(x), 1000)
-    # kde = kde(x)
-    # plt.plot(x, kde)
     
     peaks, heights = find_peaks(kde, height=0)
-    # plt.plot(kde)
-    # plt.plot(peaks, kde[peaks], "x")
-    # plt.plot(np.zeros_like(kde), "--", color="gray")
-    # plt.show()
-    
     
     return vaf
     

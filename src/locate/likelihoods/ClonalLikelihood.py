@@ -9,6 +9,13 @@ import numpy as np
 
 
 class ClonalLikelihood(TorchDistribution):
+    """_summary_
+
+    Parameters
+    ----------
+    TorchDistribution : _type_
+        _description_
+    """
 
     def __init__(self,
                  x = None,
@@ -44,6 +51,14 @@ class ClonalLikelihood(TorchDistribution):
 
 
     def log_prob(self, inp):
+        """_summary_
+
+        Parameters
+        ----------
+        inp : _type_
+            _description_
+        """
+        
         dr_lk = 0
         baf_lk = 0
         vaf_lk = 0
@@ -96,6 +111,24 @@ class ClonalLikelihood(TorchDistribution):
 
 
 def get_clonal_peaks(tot, Major, minor, purity):
+    """_summary_
+
+    Parameters
+    ----------
+    tot : _type_
+        _description_
+    Major : _type_
+        _description_
+    minor : _type_
+        _description_
+    purity : _type_
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
     mult = []
     for i,v in enumerate(Major):
         m = []

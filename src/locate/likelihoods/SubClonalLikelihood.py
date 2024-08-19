@@ -8,7 +8,13 @@ from numbers import Number
 
 
 class SubClonalLikelihood(TorchDistribution):
-    has_rsample = False
+    """_summary_
+
+    Parameters
+    ----------
+    TorchDistribution : _type_
+        _description_
+    """
 
     def __init__(self,
                  x = None,
@@ -45,6 +51,14 @@ class SubClonalLikelihood(TorchDistribution):
 
 
     def log_prob(self, inp):
+        """_summary_
+
+        Parameters
+        ----------
+        inp : _type_
+            _description_
+        """
+        
         dr_lk = 0
         baf_lk = 0
         vaf_lk = 0
@@ -66,7 +80,6 @@ class SubClonalLikelihood(TorchDistribution):
                                 torch.sqrt(self.snp_dp)).log_prob(
             inp["dr"]
             )
-        
                     
         tot_lk = self.scaling_factors[0] * baf_lk + self.scaling_factors[1] * dr_lk + self.scaling_factors[2] * vaf_lk 
         return(tot_lk)
@@ -74,6 +87,22 @@ class SubClonalLikelihood(TorchDistribution):
 
 
 def get_sub_clonal_peaks(tot, Major, minor, purity, ccf):
+    """_summary_
+
+    Parameters
+    ----------
+    tot : _type_
+        _description_
+    Major : _type_
+        _description_
+    minor : _type_
+        _description_
+    purity : _type_
+        _description_
+    ccf : _type_
+        _description_
+    """
+    
     # mult = []
     # for i,v in enumerate(Major):
     #     m = []

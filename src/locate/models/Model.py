@@ -2,8 +2,12 @@ from abc import ABC, abstractmethod
 import torch
 
 class Model(ABC):
-    """
-    General Structure for a Model
+    """_summary_
+
+    Parameters
+    ----------
+    ABC : _type_
+        _description_
     """
 
     def __init__(self, data_dict, data_name):
