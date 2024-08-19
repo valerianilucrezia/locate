@@ -4,11 +4,11 @@ import torch
 from torch.distributions import constraints
 from pyro.distributions.torch_distribution import TorchDistribution
 from numbers import Number
+import numpy as np
 
 
 
 class ClonalLikelihood(TorchDistribution):
-    has_rsample = False
 
     def __init__(self,
                  x = None,
@@ -68,27 +68,26 @@ class ClonalLikelihood(TorchDistribution):
                 )
         
         # VAF
-        # print(self.x)
-        # print(self.tot)
-        # print(self.Major)
-        # print(self.minor)
-        
         if self.dp != None:
             clonal_peaks = get_clonal_peaks(self.tot[self.x], self.Major[self.x], self.minor[self.x], self.purity)
-            #thr = sum(peaks)/2
-            #mirr = sum(peaks)
-            
             
             tmp_vaf_lk = []
             for cn in clonal_peaks:
-                tmp_peak = 0.0
-                for p in cn:
-                    bin_lk = dist.Binomial(total_count = inp["dp"], 
-                                            probs = p).log_prob(
-                    inp["vaf"]
-                    )
-                    tmp_peak+= (1/len(cn)) * bin_lk
-                tmp_vaf_lk.append(tmp_peak)
+                thr = (sum(cn)/2).detach()
+                mirr = sum(cn).detach()
+
+                vv = inp["vaf"]/inp["dp"]
+                vaf = torch.tensor(np.where(vv <= thr, mirr - vv, vv))
+                vaf = vaf*inp["dp"]
+                vaf = vaf.to(torch.int64)
+                vaf[vaf>inp["dp"]] = inp["dp"][vaf>inp["dp"]]
+                
+                p = max(cn)
+                bin_lk = dist.Binomial(total_count = inp["dp"], 
+                                        probs = p).log_prob(
+                    vaf
+                )
+                tmp_vaf_lk.append(bin_lk) 
             vaf_lk = torch.cat(tmp_vaf_lk, dim=1)
 
         tot_lk = self.scaling_factors[0] * baf_lk + self.scaling_factors[1] * dr_lk + self.scaling_factors[2] * vaf_lk 
