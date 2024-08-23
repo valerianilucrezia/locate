@@ -29,7 +29,7 @@ class SqueezableDict(dict):
     
 
 
-class Clonal(Model):
+class SubClonal(Model):
     # parameters of the HMM + other stuff specific to CNA calling
 
     params = {'jumping_prob' : 1e-2,                                              
