@@ -66,6 +66,8 @@ def plot_simulations(snp, snv, purity, coverage, path='', save = False):
         baf, 
         "lower center",
         bbox_to_anchor=(.5, 1.2), ncol=4, title=None, frameon=True,
+        prop={'size': 12},
+        markerscale=5 
     )
 
     axes[0].set_title(f'Purity = {purity}, Coverage = {coverage}')

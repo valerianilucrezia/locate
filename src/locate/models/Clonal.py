@@ -54,7 +54,7 @@ class Clonal(Model):
     """
     params = {'jumping_prob' : 1e-2,                                              
               'init_probs': torch.tensor([0.1, 0.1, 0.1, 0.1, 0.1]), 
-              'hidden_dim': 3, 
+              'hidden_dim': 4, 
               "CUDA" : False, 
               "prior_ploidy" : 2, 
               "prior_purity" : 0.9, 
