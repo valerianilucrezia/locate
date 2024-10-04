@@ -1,5 +1,4 @@
 from scipy.stats import ranksums
-
 from locate.segmentation.claspy.nearest_neighbour import cross_val_labels
 
 
