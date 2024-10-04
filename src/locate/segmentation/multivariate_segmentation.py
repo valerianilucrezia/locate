@@ -1,6 +1,6 @@
-from claspy.utils import check_input_time_series, check_excl_radius
-from claspy.clasp import ClaSPEnsemble, ClaSP
-from claspy.validation import map_validation_tests, significance_test
+from locate.segmentation.claspy.utils import check_input_time_series, check_excl_radius
+from locate.segmentation.claspy.clasp import ClaSPEnsemble, ClaSP
+from locate.segmentation.claspy.validation import map_validation_tests, significance_test
 import numpy as np
 
 """
@@ -28,12 +28,30 @@ Class that takes in a time series of an allele frequency and finds change points
         - random_state: default 2357
     Methods:
     get_first_cp: find first change point in a given time series
-    """
+"""
 
 class MultivariateClaSPSegmentation(ClaSP):
+    """_summary_
+
+    Parameters
+    ----------
+    ClaSP : _type_
+        _description_
+    """    
+    
     def __init__(self, n_segments: str|int="learn",
-                 n_estimators: int=10, window_size: str|int=10, k_neighbours: int=3, distance: str="euclidean_distance", score: str="roc_auc", early_stopping: bool=True,
-                 validation: str="significance_test", threshold: float=1e-15, excl_radius: int=5, n_jobs: int=1, random_state: int=2357):
+                 n_estimators: int=10, 
+                 window_size: str|int=10, 
+                 k_neighbours: int=3, 
+                 distance: str="euclidean_distance", 
+                 score: str="roc_auc", 
+                 early_stopping: bool=True,
+                 validation: str="significance_test", 
+                 threshold: float=1e-15, 
+                 excl_radius: int=5, 
+                 n_jobs: int=1, 
+                 random_state: int=2357):
+        
         super().__init__(window_size, k_neighbours, distance, score, excl_radius, n_jobs)
 
         self.min_seg_size = self.window_size * self.excl_radius
@@ -51,6 +69,14 @@ class MultivariateClaSPSegmentation(ClaSP):
         self.excl_radius = excl_radius
 
     def initialize(self, time_series):
+        """_summary_
+
+        Parameters
+        ----------
+        time_series : _type_
+            _description_
+        """        
+        
         self.time_series = time_series
         check_input_time_series(time_series)
         check_excl_radius(self.k_neighbours, self.excl_radius)
@@ -85,6 +111,22 @@ class MultivariateClaSPSegmentation(ClaSP):
 
     
     def local_segmentation(self, lbound, ubound, change_points):
+        """_summary_
+
+        Parameters
+        ----------
+        lbound : _type_
+            _description_
+        ubound : _type_
+            _description_
+        change_points : _type_
+            _description_
+
+        Returns
+        -------
+        _type_
+            _description_
+        """        
 
         if ubound - lbound < 2 * self.min_seg_size: 
             return self.clasp_tree, self.queue, 0
@@ -158,7 +200,11 @@ def split(clasp, sparse=True, validation="significance_test", threshold=1e-15):
     return clasp.time_series[:cp], clasp.time_series[cp:]
     
 
-"""Function to check that a given change point is valid
+def cp_is_valid(candidate, 
+                change_points, 
+                n_timepoints, 
+                min_seg_size):
+    """Function to check that a given change point is valid
     Input:
     - candidate: change point to check
     - change_points: list of change points
@@ -166,10 +212,6 @@ def split(clasp, sparse=True, validation="significance_test", threshold=1e-15):
     - min_seg_size: window_size * excl_radius
     Return:
         - Bool of whether the change point is valid or not"""
-def cp_is_valid(candidate, 
-                change_points, 
-                n_timepoints, 
-                min_seg_size):
     
     for change_point in [0] + change_points + [n_timepoints]:
         left_begin = max(0, change_point - min_seg_size)
@@ -183,6 +225,20 @@ def cp_is_valid(candidate,
 
 def take_first_cp(multivariate_clasp_objects: dict, 
                   mode):
+    """_summary_
+
+    Parameters
+    ----------
+    multivariate_clasp_objects : dict
+        _description_
+    mode : _type_
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """    
     
     profiles = [i.profile for i in multivariate_clasp_objects.values()]
     cps = [np.argmax(i) for i in profiles]
@@ -204,6 +260,16 @@ def take_first_cp(multivariate_clasp_objects: dict,
 # What is validation test referring to?
 def validate_first_cp(multivariate_clasp_objects: dict,
                       cp):
+    """_summary_
+
+    Parameters
+    ----------
+    multivariate_clasp_objects : dict
+        _description_
+    cp : _type_
+        _description_
+    """    
+    
     # validate clasp object for each one given as input
     for ts_obj in multivariate_clasp_objects.values():
         validation_test = map_validation_tests(ts_obj.validation)
@@ -234,10 +300,10 @@ def find_cp_iterative(multivariate_clasp_objects, mode):
     n_segments = np.max([ts_obj.n_segments for ts_obj in multivariate_clasp_objects.values()])
     
     for _ in range(n_segments - 1):
-        for i in [len(i.queue) == 0 for i in multivariate_clasp_objects.values()]:
-            print(i)
+        # for i in [len(i.queue) == 0 for i in multivariate_clasp_objects.values()]:
+        #     print(i)
         if all([len(i.queue) == 0 for i in multivariate_clasp_objects.values()]):
-            print('Stop because queue is empty')
+            #print('Stop because queue is empty')
             break
         for ts_obj in multivariate_clasp_objects.values():
             if len(ts_obj.queue) > 0:
@@ -279,7 +345,7 @@ def find_cp_iterative(multivariate_clasp_objects, mode):
             # TODO: Need test case
             new_score[new_score == np.inf] = -10000
             test_cp = np.argmax(new_score)
-            keep_cp = multivariate_clasp_objects["median_dr"].lbound + np.argmax(new_score)
+            keep_cp = multivariate_clasp_objects["dr"].lbound + np.argmax(new_score)
             
             
         elif mode == 'sum':
@@ -288,7 +354,7 @@ def find_cp_iterative(multivariate_clasp_objects, mode):
 
             n_series = len(multivariate_clasp_objects.keys())
             test_cp = np.argmax(new_score/n_series)
-            keep_cp = multivariate_clasp_objects["median_dr"].lbound + np.argmax(new_score/n_series)
+            keep_cp = multivariate_clasp_objects["dr"].lbound + np.argmax(new_score/n_series)
             
         
         if mode != 'max':
@@ -307,7 +373,7 @@ def find_cp_iterative(multivariate_clasp_objects, mode):
             ts_obj.scores.append(-ts_obj.priority)
         
         # define new rrange
-        lrange, rrange = (multivariate_clasp_objects["median_dr"].lbound, keep_cp), (keep_cp, multivariate_clasp_objects["median_dr"].ubound) 
+        lrange, rrange = (multivariate_clasp_objects["dr"].lbound, keep_cp), (keep_cp, multivariate_clasp_objects["dr"].ubound) 
         for prange in (lrange, rrange):
             
             low = prange[0]
