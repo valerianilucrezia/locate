@@ -11,13 +11,11 @@ import pyro
 import pyro.distributions as dist
 from pyro import poutine
 from pyro.infer import infer_discrete, config_enumerate
-from pyro.infer.autoguide import AutoDelta
+from pyro.infer.autoguide import AutoDelta, init_to_sample
 from pyro.ops.indexing import Vindex
 from pyro.util import ignore_jit_warnings
 
 
-# Here I created a new class that inherits from dict, it ha an unsqueeze method that unsqueezes all the tensors in the dict 
-# It is actually more of a dictionary generator than a proper dictionary
 
 class SqueezableDict(dict):
     """_summary_
@@ -61,7 +59,8 @@ class Clonal(Model):
               "fix_purity" : True, 
               "fix_ploidy" : True, 
               "scaling_factors" : torch.tensor([1.,1.,1.,1.]),
-              "allele_specific": True}
+              "allele_specific": True,
+              "prior_bp": None}
     
     # This has to be generalized and left empty 
     data_name = set(['baf', 'dr', 'dp_snp', 'vaf', 'dp'])
@@ -143,7 +142,13 @@ class Clonal(Model):
         
         with pyro.plate("sequences", n_sequences):
             init_logits = self._params["init_probs"].log()
-            trans_logits = probs_x.log()
+            
+            if self._params["prior_bp"] != None:
+                #print('here')
+                trans_logits = modify_trans_logits(probs_x, self._params["prior_bp"], n_sequences, len(tot))
+                
+            else:
+                trans_logits = probs_x.log()
             
             with ignore_jit_warnings():
                 obs_dist = ClonalLikelihood(
@@ -166,8 +171,14 @@ class Clonal(Model):
         
     # Autoguide
     def guide(self, *args, **kwargs):
-        return AutoDelta(poutine.block(self.model, hide_fn=lambda msg: msg["name"].startswith("x")))
+        return AutoDelta(model = poutine.block(self.model, hide_fn=lambda msg: msg["name"].startswith("x")), 
+                         init_loc_fn = self.my_init_fn)
 
+    def my_init_fn(self, site):
+        if site["name"] == "probs_x":
+            return torch.tensor((1 - self._params["jumping_prob"]) * torch.eye(5) + self._params["jumping_prob"])
+        return init_to_sample(site)
+    
     def get_Major_minor(self):
         """_summary_
 
@@ -177,7 +188,7 @@ class Clonal(Model):
             _description_
         """
         
-        combinations = list(itertools.combinations_with_replacement(range( self._params["hidden_dim"]), 2))[1:]
+        combinations = list(itertools.combinations_with_replacement(range(self._params["hidden_dim"]), 2))[1:]
         
         major_alleles = [max(combination) for combination in combinations]
         minor_alleles = [min(combination) for combination in combinations]
@@ -217,6 +228,7 @@ class Clonal(Model):
             Major, minor, tot, x = self.get_Major_minor()
             
         probs_x = learned_params['probs_x']
+        print(probs_x, probs_x.shape)
             
         measures = [i for i in list(self._data.keys()) if self._data[i] != None]
         length, n_sequences  = self._data[measures[0]].shape
@@ -235,6 +247,7 @@ class Clonal(Model):
                 
         with pyro.plate("sequences", n_sequences, dim = -1):
             x = [0]
+            
             for t in pyro.markov(range(length)):
 
                 x_new = pyro.sample(
@@ -277,6 +290,41 @@ class Clonal(Model):
                     
             return x
         
+        
+def modify_trans_logits(probs_x, prior_cp_prob, n_sequences, n_states):
+    """
+    Modify the transition probabilities to account for change point prior.
+    
+    Parameters:
+    probs_x: torch.Tensor
+        The base transition probabilities of shape (n_states, n_states).
+    prior_cp_prob: torch.Tensor
+        Prior probabilities of change points at each time step of shape (length - 1,).
+    n_sequences: int
+        Number of time steps.
+    n_states: int
+        Number of hidden states.
+    
+    Returns:
+    trans_logits: torch.Tensor
+        Transition logits modified to account for change points, of shape (length, n_states, n_states).
+    """
+    # Create a transition matrix of shape (length, n_states, n_states)
+    trans_logits = torch.zeros(n_sequences, n_states, n_states)
+ 
+    # Modify the transition matrix for each time step based on prior_cp_prob
+    for t in range(n_sequences):
+        for i in range(n_states):
+            for j in range(n_states):
+                if i == j:
+                    # Logits for staying in the same state: log(1 - prior_cp_prob[t])
+                    trans_logits[t, i, j] = torch.log(torch.tensor(1.0 - prior_cp_prob[t-1])) if t > 0 else torch.log(probs_x[i, j])
+                else:
+                    # Logits for transitioning to a different state: log(prior_cp_prob[t] / (n_states - 1))
+                    trans_logits[t, i, j] = torch.log(prior_cp_prob[t-1] / (n_states - 1)) if t > 0 else torch.log(probs_x[i, j])
+    
+    return trans_logits
+
         
 def get_clonal_peaks(tot, Major, minor, purity):
     """_summary_

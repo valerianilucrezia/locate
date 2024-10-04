@@ -34,7 +34,8 @@ def simulate_segment(genome_size = 20000000,
                     w = 20,
                     dt = 20, 
                     purity = 1,
-                    only_clonal = False):
+                    only_clonal = False,
+                    CNA = ["1:0", "1:1", "2:0", "2:1", "2:2"]):
     """_summary_
 
     Parameters
@@ -55,6 +56,8 @@ def simulate_segment(genome_size = 20000000,
         _description_, by default 1
     only_clonal : bool, optional
         _description_, by default False
+    CNA : list, optional
+        _description_, by default ["1:0", "1:1", "2:0", "2:1", "2:2"]
 
     Returns
     -------
@@ -77,13 +80,11 @@ def simulate_segment(genome_size = 20000000,
     l_tp = []
     purity = [purity for i in range(segments)]
     
-    seg_size = np.random.dirichlet(np.ones(5), size=1) * genome_size
+    seg_size = np.random.dirichlet(np.ones(segments), size=1) * genome_size
     seg_size = list(seg_size[0])
     
     # num_bins =  genome size
     for i, s in enumerate(seg_size):
-        CNA = ["1:0", "1:1", "2:0", "2:1", "2:2"]
-      
         cna_start = end[-1]
         cna_end = cna_start + np.floor(s)
       
