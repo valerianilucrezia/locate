@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import pandas as pd
 import torch
 import numpy as np
@@ -5,10 +7,10 @@ import numpy as np
 import argparse
 from locate.segmentation.multivariate_clasp import MultivariateClaSP
 
-def read_data(in_file, in_dir, data_type = 'ill'):
-    tmp_csv = f'{in_dir}/tmp_{data_type}.csv'    
+def read_data(in_file, in_dir, ch, data_type = 'ill'):
+    tmp_csv = f'{in_dir}/tmp_{data_type}_{ch}.csv'    
 
-    data = pd.read_csv(in_file, sep = ',') 
+    data = pd.read_csv(in_file, sep = ',', on_bad_lines='skip') 
     data['pos'] = range(1, len(data) + 1)
     
     if data_type == 'ill':
@@ -47,14 +49,18 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     f = f'{args.indir}/{args.sample}_chr{args.chr}.csv'
-    data_ill = read_data(f, data_type = 'ill')
-    data_np = read_data(f, data_type = 'np')
-    
+    print('start processing data')
+    data_ill = read_data(f, args.indir, args.chr, data_type = 'ill')
+    data_np = read_data(f, args.indir, args.chr, data_type = 'np')
+
+    print('start segmentation Illumina')
     bp_ill = run_segmentation(data_ill)
+
+    print('start segmentation Nanopore')
     bp_np = run_segmentation(data_np)
     
-    np.save(arr = np.array(bp_ill[0]), file = f'{args.outdir}/{args.sample}_chr{c}_ILL_{bp_ill[1]}')
-    np.save(arr = np.array(bp_np[0]), file = f'{args.outdir}/{args.sample}_chr{c}_ILL_{bp_np[1]}')
+    np.save(arr = np.array(bp_ill[0]), file = f'{args.outdir}/{args.sample}_chr{args.chr}_ILL_{bp_ill[1]}')
+    np.save(arr = np.array(bp_np[0]), file = f'{args.outdir}/{args.sample}_chr{args.chr}_ILL_{bp_np[1]}')
     
     
     

@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import pyro
 from pyro.optim import Adam, ClippedAdam
 from pyro.infer import TraceMeanField_ELBO, TraceEnum_ELBO, TraceGraph_ELBO, Trace_ELBO
@@ -11,8 +13,10 @@ import argparse
 import locate.locate as l
 from locate.models import Clonal
 
-def read_data(in_file, in_dir, data_type = 'ill'):
-    tmp_csv = f'{in_dir}/tmp_{data_type}.csv'    
+print(torch.cuda.is_available())
+
+def read_data(in_file, data_type = 'ill'):
+    #tmp_csv = f'{in_dir}/tmp_{data_type}_{ch}.csv'    
 
     data = pd.read_csv(in_file, sep = ',') 
     data['pos'] = range(1, len(data) + 1)
@@ -35,7 +39,7 @@ def read_data(in_file, in_dir, data_type = 'ill'):
                       'dp_snp':torch.tensor(np.array(data.DP_NP).reshape(-1, 1)),
                       'orginal_baf':torch.tensor(np.array(data.original_BAF).reshape(-1, 1))}
     
-    return tmp_csv
+    return data_input
 
 def run_hmm(data_input, gpu = False, nsteps = 400):
     locate = l.LOCATE(CUDA = gpu)
@@ -73,12 +77,14 @@ if __name__ == '__main__':
     parser.add_argument("-o", "--outdir", type=str, help="outdir", default = "")
     args = parser.parse_args()
 
+    gpu = torch.cuda.is_available()
+
     f = f'{args.indir}/{args.sample}_chr{args.chr}.csv'
     data_ill = read_data(f, data_type = 'ill')
     data_np = read_data(f, data_type = 'np')
     
-    params_ill = run_hmm(data_ill)
-    params_np = run_hmm(data_np)
+    params_ill = run_hmm(data_ill, gpu = gpu)
+    params_np = run_hmm(data_np, gpu = gpu)
     
     res_ill = pd.DataFrame({'CN_Major':params_ill["CN_Major"]+0.05,
                            'CN_minor':params_ill["CN_minor"]-0.05,
