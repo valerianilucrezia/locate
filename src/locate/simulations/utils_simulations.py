@@ -6,7 +6,7 @@ import pickle
 import torch
 import os
 
-def create_data_input(snp, snv):
+def create_input_simulations(snp, snv):
     """_summary_
 
     Parameters
@@ -57,9 +57,9 @@ def plot_simulations(snp, snv, purity, coverage, path='', save = False):
     sns.set_theme(style="white", font_scale=1)
     fig, axes = plt.subplots(3, 1, figsize=(8, 7))
 
-    baf = sns.scatterplot(data=snp, x="pos", y="baf", s=2, ax=axes[0], hue="CN_1")
-    dr = sns.scatterplot(data=snp, x="pos", y="dr", s=2, ax=axes[1], hue="CN_1", legend=False)
-    vaf = sns.scatterplot(data=snv, x="pos", y="vaf", s=2, ax=axes[2], hue="CN_1", legend=False)
+    baf = sns.scatterplot(data=snp, x="pos", y="baf", s=3, ax=axes[0], hue="CN_1")
+    dr = sns.scatterplot(data=snp, x="pos", y="dr", s=3, ax=axes[1], hue="CN_1", legend=False)
+    vaf = sns.scatterplot(data=snv, x="pos", y="vaf", s=3, ax=axes[2], hue="CN_1", legend=False)
 
     axes[0].set_ylim(0,1) 
     sns.move_legend(
@@ -73,7 +73,7 @@ def plot_simulations(snp, snv, purity, coverage, path='', save = False):
     axes[0].set_title(f'Purity = {purity}, Coverage = {coverage}')
     fig.tight_layout()
     
-def save_data(SNP, SNV, path, name):
+def save_data_simulations(SNP, SNV, path, name):
     """_summary_
 
     Parameters
@@ -97,4 +97,48 @@ def save_data(SNP, SNV, path, name):
     pickle.dump(data_input, f)
     f.close()
     return
+    
+    
+def plot_results_simulations(snp, snv, res, params, purity, coverage):
+    """_summary_
+
+    Parameters
+    ----------
+    snp : _type_
+        _description_
+    snv : _type_
+        _description_
+    res : _type_
+        _description_
+    params : _type_
+        _description_
+    purity : _type_
+        _description_
+    coverage : _type_
+        _description_
+    """
+    
+    sns.set_theme(style="white", font_scale=1)
+    fig, axes = plt.subplots(4, 1, figsize=(9, 9))
+
+    baf = sns.scatterplot(data=snp, x="pos", y="baf", s=2, ax=axes[0], hue="CN_1")
+    dr = sns.scatterplot(data=snp, x="pos", y="dr", s=2, ax=axes[1], hue="CN_1", legend=False)
+    vaf = sns.scatterplot(data=snv, x="pos", y="vaf", s=2, ax=axes[2], hue="CN_1", legend=False)
+
+    cn = sns.scatterplot(data=res, x="pos", y="CN_Major", s=2, ax=axes[3], legend=False)
+    cn = sns.scatterplot(data=res, x="pos", y="CN_minor", s=2, ax=axes[3], legend=False)
+
+    axes[0].set_ylim(0,1) 
+    sns.move_legend(
+        baf, 
+        "lower center",
+        bbox_to_anchor=(.5, 1.2), ncol=4, title=None, frameon=True,
+        prop={'size': 12},
+        markerscale=5 
+    )
+
+    axes[0].set_title(f'True Purity = {purity}, Coverage = {coverage}')
+    inf_purity = float(params['purity'])
+    axes[3].set_title(f'Inferred Purity = {round(inf_purity, 2)}')
+    fig.tight_layout()
     

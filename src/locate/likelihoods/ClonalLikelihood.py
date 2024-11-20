@@ -76,7 +76,7 @@ class ClonalLikelihood(TorchDistribution):
             
         # DR         
         if self.has_dr:        
-            dr = ((2 * (1-self.purity)) + (self.purity * (self.Major[self.x] + self.minor[self.x]))) / self.ploidy
+            dr = ((2 * (1-self.purity)) + (self.purity * (self.Major[self.x] + self.minor[self.x]))) / (2*(1-self.purity) + (self.purity * self.ploidy))
             dr_lk = dist.Gamma(dr * torch.sqrt(self.snp_dp) + 1, 
                                     torch.sqrt(self.snp_dp)).log_prob(
                 inp["dr"]

@@ -169,6 +169,9 @@ class MultivariateClaSP:
             axs[i].set_ylabel(str(variables[i]))
             axs[i].set_xlabel('pos')
             axs[i].vlines(bps, ymin = min(profile) - 0.05, ymax = max(profile) + 0.05, colors = 'indianred', label = 'Predicted BP', linestyles = 'dashed')
+            
+            if variables[i] == 'baf' or variables[i] == 'vaf':
+                axs[i].set_ylim(0,1)
 
         if title is not None:
             fig.suptitle(title)

@@ -51,7 +51,7 @@ class Clonal(Model):
         _description_
     """
     params = {'jumping_prob' : 1e-2,                                              
-              'init_probs': torch.tensor([0.1, 0.1, 0.1, 0.1, 0.1]), 
+              'init_probs': torch.tensor([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]), 
               'hidden_dim': 3, 
               "CUDA" : False, 
               "prior_ploidy" : 2, 
@@ -95,6 +95,9 @@ class Clonal(Model):
                 "probs_x",
                 dist.Dirichlet((1 - self._params["jumping_prob"]) * torch.eye(x.shape[0]) + self._params["jumping_prob"]).to_event(1),
             )
+            #print(x.shape[0])
+            #print(probs_x)
+            #print(tot)
             
         else:
             probs_x = pyro.sample(
@@ -143,12 +146,13 @@ class Clonal(Model):
         with pyro.plate("sequences", n_sequences):
             init_logits = self._params["init_probs"].log()
             
-            if self._params["prior_bp"] != None:
+            #if self._params["prior_bp"] != None:
                 #print('here')
-                trans_logits = modify_trans_logits(probs_x, self._params["prior_bp"], n_sequences, len(tot))
+            #    trans_logits = modify_trans_logits(probs_x, self._params["prior_bp"], n_sequences, len(tot))
                 
-            else:
-                trans_logits = probs_x.log()
+            #else:
+            #print(probs_x)
+            trans_logits = probs_x.log()
             
             with ignore_jit_warnings():
                 obs_dist = ClonalLikelihood(
@@ -228,7 +232,6 @@ class Clonal(Model):
             Major, minor, tot, x = self.get_Major_minor()
             
         probs_x = learned_params['probs_x']
-        print(probs_x, probs_x.shape)
             
         measures = [i for i in list(self._data.keys()) if self._data[i] != None]
         length, n_sequences  = self._data[measures[0]].shape
@@ -270,7 +273,7 @@ class Clonal(Model):
                     
                                            
                 if self._data["dr"] is not None:     
-                    dr = ((2 * (1-purity)) + (purity * (Major[x_new] + minor[x_new]))) / ploidy
+                    dr = ((2 * (1-purity)) + (purity * (Major[x_new] + minor[x_new]))) / (2*(1-purity) + (purity * ploidy))
                     dr_lk = pyro.factor("y_dr_{}".format(t), 
                                         dist.Gamma(dr * torch.sqrt(self._data["dp_snp"][t,:]) + 1, 
                                                    torch.sqrt(self._data["dp_snp"][t,:])).log_prob(
