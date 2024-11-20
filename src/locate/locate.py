@@ -64,6 +64,9 @@ class LOCATE:
         """
         
         assert self._model_fun is not None
+        if self._CUDA:
+            data = {k: v.cuda() for k, v in data.items() if torch.is_tensor(v)}
+        
         self._model = self._model_fun(data)
         self._model_string = type(self._model).__name__
 
@@ -111,6 +114,8 @@ class LOCATE:
         
         if self._CUDA:
             param_dict['CUDA'] = True
+            param_dict = {k: v.cuda() if torch.is_tensor(v) else v for k, v in param_dict.items()}
+
         self._model.set_params(param_dict)
 
     def run(self, steps,param_optimizer = {'lr' : 0.05}, e = 0.01, patience = 5, param_loss = None, seed = 3):
@@ -142,6 +147,10 @@ class LOCATE:
 
         model = self._model.model
         guide = self._model.guide(None)
+        
+        if self._CUDA:
+            model = model.cuda()
+            guide = guide.cuda()
 
         optim = self._optimizer(param_optimizer)
         elbo = self._loss(**param_loss) if param_loss is not None else self._loss()
