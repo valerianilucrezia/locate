@@ -148,9 +148,10 @@ class LOCATE:
         model = self._model.model
         guide = self._model.guide(None)
         
-        if self._CUDA:
-            model = model.cuda()
-            guide = guide.cuda()
+        #if self._CUDA:
+        #    device = torch.device('cuda:0')
+        #    model = model.to(device)
+        #    guide = guide.to(device)
 
         optim = self._optimizer(param_optimizer)
         elbo = self._loss(**param_loss) if param_loss is not None else self._loss()

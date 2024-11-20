@@ -18,7 +18,7 @@ print(torch.cuda.is_available())
 def read_data(in_file, data_type = 'ill'):
     #tmp_csv = f'{in_dir}/tmp_{data_type}_{ch}.csv'    
 
-    data = pd.read_csv(in_file, sep = ',') 
+    data = pd.read_csv(in_file, sep = ',', on_bad_lines='skip') 
     data['pos'] = range(1, len(data) + 1)
     
     if data_type == 'ill':
@@ -82,7 +82,8 @@ if __name__ == '__main__':
     f = f'{args.indir}/{args.sample}_chr{args.chr}.csv'
     data_ill = read_data(f, data_type = 'ill')
     data_np = read_data(f, data_type = 'np')
-    
+    print(data_ill)   
+ 
     params_ill = run_hmm(data_ill, gpu = gpu)
     params_np = run_hmm(data_np, gpu = gpu)
     
@@ -90,7 +91,7 @@ if __name__ == '__main__':
                            'CN_minor':params_ill["CN_minor"]-0.05,
                             'baf':data_ill['baf'].view(-1).tolist(),
                             'dr':data_ill['dr'].view(-1).tolist(),
-                            'original_baf':data_ill['original_baf'].view(-1).tolist(),
+                            'original_baf':data_ill['orginal_baf'].view(-1).tolist(),
                             'pos':[i for i in range(len(params_ill["CN_minor"]))],
                             })
     
@@ -98,12 +99,11 @@ if __name__ == '__main__':
                            'CN_minor':params_np["CN_minor"]-0.05,
                             'baf':data_np['baf'].view(-1).tolist(),
                             'dr':data_np['dr'].view(-1).tolist(),
-                            'original_baf':data_np['original_baf'].view(-1).tolist(),
+                            'original_baf':data_np['orginal_baf'].view(-1).tolist(),
                             'pos':[i for i in range(len(params_np["CN_minor"]))],
                             })
     
-    res_ill.to_csv(f'', header=True)
-    res_np.to_csv(f'{args.outdir}/{args.sample}_chr{c}_inference_ILL.csv', header=True)
-    res_np.to_csv(f'{args.outdir}/{args.sample}_chr{c}_inference_NP.csv', header=True)
+    res_ill.to_csv(f'{args.outdir}/{args.sample}_chr{args.chr}_inference_ILL.csv', header=True)
+    res_np.to_csv(f'{args.outdir}/{args.sample}_chr{args.chr}_inference_NP.csv', header=True)
     
     

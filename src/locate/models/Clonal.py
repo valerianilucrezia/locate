@@ -134,7 +134,7 @@ class Clonal(Model):
         else:
             mean_cov = None
             
-        if self._data["dp"] != None:
+        if 'dp' in self._data.keys():
             dp = self._data["dp"]
         else:
             dp = None
@@ -281,7 +281,7 @@ class Clonal(Model):
                                                        ))
                 
                 
-                if self._data["vaf"] is not None:
+                if "vaf" in self._data.keys():
                     clonal_peaks = get_clonal_peaks(tot[x_new], Major[x_new], minor[x_new], purity)
                     
                     tmp_vaf_lk = []
