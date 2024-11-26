@@ -5,6 +5,8 @@ import torch
 import numpy as np
 
 import argparse
+import os
+
 from locate.segmentation.multivariate_clasp import MultivariateClaSP
 
 def read_data(in_file, in_dir, ch, data_type = 'ill'):
@@ -14,13 +16,17 @@ def read_data(in_file, in_dir, ch, data_type = 'ill'):
     data['pos'] = range(1, len(data) + 1)
     
     if data_type == 'ill':
-        data['BAF_ILL'] = data['BAF_ILL'].apply(lambda x: 1 - x if x > 0.5 else x)
+        data['BAF_ILL'] = data['BAF_ILL'].apply(lambda x: 1.01 - x if x > 0.5 else x)
+        data['BAF_ILL'] = data['BAF_ILL'].apply(lambda x: 0.01 if x == 0 else x)
+        
         data = data[data['BAF_ILL']>0]
         test_df = pd.DataFrame({"baf":data.BAF_ILL, "dr":data.DR_ILL, "pos":data.pos})
         test_df.to_csv(path_or_buf=tmp_csv, sep=",")
     
     elif data_type == 'np':
-        data['BAF_NP'] = data['BAF_NP'].apply(lambda x: 1 - x if x > 0.5 else x)
+        data['BAF_NP'] = data['BAF_NP'].apply(lambda x: 1.01 - x if x > 0.5 else x)
+        data['BAF_NP'] = data['BAF_NP'].apply(lambda x: 0.01 if x == 0 else x)
+        
         data = data[data['BAF_NP']>0]
         test_df = pd.DataFrame({"baf":data.BAF_NP, "dr":data.DR_NP, "pos":data.pos})
         test_df.to_csv(path_or_buf=tmp_csv, sep=",")
@@ -46,21 +52,30 @@ if __name__ == '__main__':
     parser.add_argument("-s", "--sample", type=str, help="sample", default = "PDO61")
     parser.add_argument("-c", "--chr", type=str, help="chromosome", default = "1")
     parser.add_argument("-o", "--outdir", type=str, help="outdir", default = "")
+    
+    parser.add_argument("-m", "--mode", type=str, help="mode", default = "sum")
+    parser.add_argument("-w", "--windsize", type=int, help="window size", default = 50)
+    parser.add_argument("-t", "--thr", type=float, help="thr", default = 1e-10)    
+
     args = parser.parse_args()
 
+    os.makedirs(f'{args.outdir}/{args.sample}/', exist_ok=True)
+    
     f = f'{args.indir}/{args.sample}_chr{args.chr}.csv'
     print('start processing data')
+    print(f'with params = {args.mode}, {args.windsize}, {args.thr}')
+
     data_ill = read_data(f, args.indir, args.chr, data_type = 'ill')
     data_np = read_data(f, args.indir, args.chr, data_type = 'np')
 
     print('start segmentation Illumina')
-    bp_ill = run_segmentation(data_ill)
+    bp_ill = run_segmentation(data_ill, md = args.mode, thr = args.thr, wsize = args.windsize)
 
     print('start segmentation Nanopore')
-    bp_np = run_segmentation(data_np)
+    bp_np = run_segmentation(data_np, md = args.mode, thr = args.thr, wsize = args.windsize)
     
-    np.save(arr = np.array(bp_ill[0]), file = f'{args.outdir}/{args.sample}_chr{args.chr}_ILL_{bp_ill[1]}')
-    np.save(arr = np.array(bp_np[0]), file = f'{args.outdir}/{args.sample}_chr{args.chr}_ILL_{bp_np[1]}')
+    np.save(arr = np.array(bp_ill[0]), file = f'{args.outdir}/{args.sample}/{args.sample}_chr{args.chr}_ILL_{bp_ill[1]}')
+    np.save(arr = np.array(bp_np[0]), file = f'{args.outdir}/{args.sample}/{args.sample}_chr{args.chr}_NP_{bp_np[1]}')
     
     
     

@@ -9,6 +9,7 @@ import torch
 import numpy as np
 
 import argparse
+import os
 
 import locate.locate as l
 from locate.models import Clonal
@@ -23,7 +24,9 @@ def read_data(in_file, data_type = 'ill'):
     
     if data_type == 'ill':
         data['original_BAF'] = data['BAF_ILL']
-        data['BAF_ILL'] = data['BAF_ILL'].apply(lambda x: 1 - x if x > 0.5 else x)
+        data['BAF_ILL'] = data['BAF_ILL'].apply(lambda x: 1.01 - x if x > 0.5 else x)
+        data['BAF_ILL'] = data['BAF_ILL'].apply(lambda x: 0.01 if x == 0 else x)
+        
         data = data[data['BAF_ILL']>0]
         data_input = {'baf':torch.tensor(np.array(data.BAF_ILL).reshape(-1, 1)),
                       'dr':torch.tensor(np.array(data.DR_ILL).reshape(-1, 1)),
@@ -32,7 +35,9 @@ def read_data(in_file, data_type = 'ill'):
     
     elif data_type == 'np':
         data['original_BAF'] = data['BAF_NP']
-        data['BAF_NP'] = data['BAF_NP'].apply(lambda x: 1 - x if x > 0.5 else x)
+        data['BAF_NP'] = data['BAF_NP'].apply(lambda x: 1.01 - x if x > 0.5 else x)
+        data['BAF_NP'] = data['BAF_NP'].apply(lambda x: 0.01 if x == 0 else x)
+        
         data = data[data['BAF_NP']>0]
         data_input = {'baf':torch.tensor(np.array(data.BAF_NP).reshape(-1, 1)),
                       'dr':torch.tensor(np.array(data.DR_NP).reshape(-1, 1)),
@@ -82,7 +87,6 @@ if __name__ == '__main__':
     f = f'{args.indir}/{args.sample}_chr{args.chr}.csv'
     data_ill = read_data(f, data_type = 'ill')
     data_np = read_data(f, data_type = 'np')
-    print(data_ill)   
  
     params_ill = run_hmm(data_ill, gpu = gpu)
     params_np = run_hmm(data_np, gpu = gpu)
@@ -103,7 +107,9 @@ if __name__ == '__main__':
                             'pos':[i for i in range(len(params_np["CN_minor"]))],
                             })
     
-    res_ill.to_csv(f'{args.outdir}/{args.sample}_chr{args.chr}_inference_ILL.csv', header=True)
-    res_np.to_csv(f'{args.outdir}/{args.sample}_chr{args.chr}_inference_NP.csv', header=True)
+
+    os.makedirs(f'{args.outdir}/{args.sample}/', exist_ok=True)
+    res_ill.to_csv(f'{args.outdir}/{args.sample}/{args.sample}_chr{args.chr}_inference_ILL.csv', header=True)
+    res_np.to_csv(f'{args.outdir}/{args.sample}//{args.sample}_chr{args.chr}_inference_NP.csv', header=True)
     
     
