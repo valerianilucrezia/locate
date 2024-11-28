@@ -147,11 +147,6 @@ class LOCATE:
 
         model = self._model.model
         guide = self._model.guide(None)
-        
-        #if self._CUDA:
-        #    device = torch.device('cuda:0')
-        #    model = model.to(device)
-        #    guide = guide.to(device)
 
         optim = self._optimizer(param_optimizer)
         elbo = self._loss(**param_loss) if param_loss is not None else self._loss()
@@ -196,12 +191,9 @@ class LOCATE:
             else:
                 conv = 0
                 
-        print("", flush = True)
         self._model_trained = model
         self._guide_trained = guide
         self._loss_trained = loss
-        print("Done!", flush=True)
-        
         return loss, num_observations
 
 

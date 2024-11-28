@@ -7,8 +7,9 @@ from numbers import Number
 import numpy as np
 
 
+# Clonal likelihood for join Nanopore and Illumina data
 
-class ClonalLikelihood(TorchDistribution):
+class JoinClonalLikelihood(TorchDistribution):
     """_summary_
 
     Parameters
@@ -23,6 +24,7 @@ class ClonalLikelihood(TorchDistribution):
                  minor = None,
                  tot = None,
                  snp_dp = None,
+                 snp_dp_ill = None,
                  dp = None,
                  scaling_factors = torch.tensor([1.,1.,1.,1.]),
                  purity = 1, 
@@ -30,7 +32,8 @@ class ClonalLikelihood(TorchDistribution):
                  batch_shape = None,
                  validate_args = False,
                  has_baf = True,
-                 has_dr = True):
+                 has_dr = True,
+                 has_ill_data = False):
 
         self.x = x
         self.Major = Major
@@ -40,14 +43,16 @@ class ClonalLikelihood(TorchDistribution):
         self.purity = purity
         self.ploidy = ploidy
         self.snp_dp = snp_dp
+        self.snp_dp_ill = snp_dp_ill
         self.dp = dp
         self.validate_args = validate_args
         self.has_baf = has_baf
         self.has_dr = has_dr
+        self.has_ill_data = has_ill_data
         
         
         batch_shape = torch.Size(batch_shape)
-        super(ClonalLikelihood, self).__init__(batch_shape, validate_args=validate_args)
+        super(JoinClonalLikelihood, self).__init__(batch_shape, validate_args=validate_args)
 
 
     def log_prob(self, inp):
@@ -62,6 +67,9 @@ class ClonalLikelihood(TorchDistribution):
         dr_lk = 0
         baf_lk = 0
         vaf_lk = 0
+        
+        dr_lk_ill = 0
+        baf_lk_ill = 0
     
         # BAF
         if self.has_baf:
@@ -81,6 +89,23 @@ class ClonalLikelihood(TorchDistribution):
                                     torch.sqrt(self.snp_dp)).log_prob(
                 inp["dr"]
                 )
+                                    
+        if self.has_ill_data:
+            num = (self.purity * self.minor[self.x]) +  (1 - self.purity)
+            den = (self.purity * (self.Major[self.x] + self.minor[self.x])) + (2 * (1 - self.purity))
+            prob = num / den
+            alpha = ((self.snp_dp_ill-2) * prob + 1) / (1 - prob)      
+            baf_lk_ill = dist.Beta(concentration1 = alpha, 
+                                concentration0 = self.snp_dp_ill).log_prob(
+                inp["baf_ill"]
+                )
+
+            dr = ((2 * (1-self.purity)) + (self.purity * (self.Major[self.x] + self.minor[self.x]))) / (2*(1-self.purity) + (self.purity * self.ploidy))
+            dr_lk_ill = dist.Gamma(dr * torch.sqrt(self.snp_dp_ill) + 1, 
+                                    torch.sqrt(self.snp_dp_ill)).log_prob(
+                inp["dr_ill"]
+                )
+            
         
         # VAF
         if self.dp != None and self.vaf != None:
@@ -105,7 +130,7 @@ class ClonalLikelihood(TorchDistribution):
                 tmp_vaf_lk.append(bin_lk) 
             vaf_lk = torch.cat(tmp_vaf_lk, dim=1)
 
-        tot_lk = self.scaling_factors[0] * baf_lk + self.scaling_factors[1] * dr_lk + self.scaling_factors[2] * vaf_lk 
+        tot_lk = self.scaling_factors[0] * (baf_lk + baf_lk_ill) + self.scaling_factors[1] * (dr_lk + dr_lk_ill) + self.scaling_factors[2] * vaf_lk 
         return(tot_lk)
 
 

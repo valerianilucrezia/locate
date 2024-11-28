@@ -5,7 +5,7 @@ import torch.nn as nn
 from torch.distributions import constraints
 
 from locate.models.Model import Model
-from locate.likelihoods import ClonalLikelihood
+from locate.likelihoods import JoinClonalLikelihood
 
 import pyro
 import pyro.distributions as dist
@@ -37,7 +37,7 @@ class SqueezableDict(dict):
     
 
 
-class Clonal(Model):
+class JoinClonal(Model):
     """_summary_
 
     Parameters
@@ -63,7 +63,7 @@ class Clonal(Model):
               "prior_bp": None}
     
     # This has to be generalized and left empty 
-    data_name = set(['baf', 'dr', 'dp_snp', 'vaf', 'dp'])
+    data_name = set(['baf', 'dr', 'dp_snp', 'vaf', 'dp', 'baf_ill', 'dr_ill', 'dp_snp_ill'])
 
     def __init__(self, data_dict):
         self._params = self.params.copy()
@@ -114,10 +114,13 @@ class Clonal(Model):
             
         has_baf = self._data["baf"] is not None
         has_dr = self._data["dr"] is not None
+        has_ill_data = self._data["dr_ill"] is not None and self._data["baf_ill"] is not None
         dp = self._data.get('dp', None)
             
         ploidy = self._params["prior_ploidy"] if self._params["fix_ploidy"] else int(pyro.sample("ploidy", dist.Poisson(2)))
         mean_cov = torch.mean(self._data["dp_snp"].float()) if self._data["dp_snp"] is not None else None
+        mean_cov_ill = torch.mean(self._data["dp_snp_ill"].float()) if self._data["dp_snp_ill"] is not None else None
+        
         
         measures = [i for i in list(self._data.keys()) if self._data[i] != None]
         length, n_sequences  = self._data[measures[0]].shape
@@ -135,19 +138,21 @@ class Clonal(Model):
             trans_logits = probs_x.log()
             
             with ignore_jit_warnings():
-                obs_dist = ClonalLikelihood(
+                obs_dist = JoinClonalLikelihood(
                  x = x.unsqueeze(-1),
                  Major = Major,
                  minor = minor,
                  tot = tot,
                  snp_dp = mean_cov,
+                 snp_dp_ill = mean_cov_ill,
                  dp = dp, 
                  scaling_factors = self._params["scaling_factors"],
                  purity = purity, 
                  ploidy = ploidy,
                  batch_shape = [x.shape[0], length],
                  has_baf = has_baf,
-                 has_dr = has_dr
+                 has_dr = has_dr,
+                 has_ill_data = has_ill_data
                 ).to_event(1)
 
                 hmm_dist = dist.DiscreteHMM(init_logits, trans_logits, obs_dist)
@@ -250,9 +255,28 @@ class Clonal(Model):
                                                    torch.sqrt(self._data["dp_snp"][t,:])).log_prob(
                                                        self._data["dr"][t,:]
                                                        ))
+                    
+                if self._data["dr_ill"] is not None and self._data["baf_ill"] is not None :     
+                    dr = ((2 * (1-purity)) + (purity * (Major[x_new] + minor[x_new]))) / (2*(1-purity) + (purity * ploidy))
+                    dr_lk_ill = pyro.factor("y_dr_ill_{}".format(t), 
+                                        dist.Gamma(dr * torch.sqrt(self._data["dp_snp_ill"][t,:]) + 1, 
+                                                   torch.sqrt(self._data["dp_snp_ill"][t,:])).log_prob(
+                                                       self._data["dr_ill"][t,:]
+                                                       ))
                 
                 
-                if "vaf" in self._data.keys():
+                    num = (purity * minor[x_new]) +  (1 - purity)
+                    den = (purity * (Major[x_new] + minor[x_new])) + (2 * (1 - purity))
+                    prob = num / den
+                    
+                    alpha = ((self._data["dp_snp_ill"][t,:]-2) * prob + 1) / (1 - prob)
+                    baf_lk = pyro.factor("y_baf_ill_{}".format(t), 
+                                         dist.Beta(concentration1 = alpha, 
+                                                   concentration0 = self._data["dp_snp_ill"][t,:]).log_prob(
+                                                       self._data["baf_ill"][t,:]
+                                                       ))
+                
+                if  self._data["vaf"] is not None:
                     clonal_peaks = get_clonal_peaks(tot[x_new], Major[x_new], minor[x_new], purity)
                     
                     tmp_vaf_lk = []
