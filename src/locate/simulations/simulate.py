@@ -34,6 +34,7 @@ def simulate_segment(genome_size = 20000000,
                     w = 20,
                     dt = 20, 
                     purity = 1,
+                    ploidy = 2,
                     only_clonal = False,
                     CNA = ["1:0", "1:1", "2:0", "2:1", "2:2"]):
     """_summary_
@@ -79,6 +80,8 @@ def simulate_segment(genome_size = 20000000,
     l_ccf = []
     l_tp = []
     purity = [purity for i in range(segments)]
+    ploidy = [ploidy for i in range(segments)]
+    
     
     seg_size = np.random.dirichlet(np.ones(segments), size=1) * genome_size
     seg_size = list(seg_size[0])
@@ -140,6 +143,7 @@ def simulate_segment(genome_size = 20000000,
                        'SNP':snp,
                        'SNV':snv,
                        'purity':purity, 
+                       'ploidy':ploidy,
                        'Major_1':Major_1,
                        'minor_1':minor_1, 
                        'Major_2':Major_2,
@@ -263,8 +267,8 @@ def simulate_SNPs_clonal(seg):
     sim_baf = np.random.beta(alpha, dp)
     
     # DR
-    
-    exp_dr = ((2 * (1-purity)) + (purity * (seg.Major_1 + seg.minor_1))) / 2
+    ploidy = ((2*(1-purity)) + (purity * seg.ploidy))
+    exp_dr = ((2 * (1-purity)) + (purity * (seg.Major_1 + seg.minor_1))) / ploidy
     sim_dr = np.random.gamma(shape = exp_dr * np.sqrt(dp) + 1, 
                              scale = 1/np.sqrt(dp))
     
@@ -324,7 +328,8 @@ def expected_dr_subclonal(seg):
     nb2 = seg.minor_2
     ccf = seg.ccf
     purity = seg.purity
-    expected_dr = (2*(1-purity) + purity*(ccf*(na1 + nb1) + (1- ccf)*(na2 + nb2))) / 2#ploidy 
+    ploidy = ((2*(1-purity)) + (purity * seg.ploidy))
+    expected_dr = (2*(1-purity) + purity*(ccf*(na1 + nb1) + (1- ccf)*(na2 + nb2))) / ploidy 
     
     return expected_dr
 

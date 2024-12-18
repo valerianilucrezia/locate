@@ -73,14 +73,32 @@ class JoinClonalLikelihood(TorchDistribution):
     
         # BAF
         if self.has_baf:
-            num = (self.purity * self.minor[self.x]) +  (1 - self.purity)
-            den = (self.purity * (self.Major[self.x] + self.minor[self.x])) + (2 * (1 - self.purity))
-            prob = num / den
-            alpha = ((self.snp_dp-2) * prob + 1) / (1 - prob)      
-            baf_lk = dist.Beta(concentration1 = alpha, 
-                                concentration0 = self.snp_dp).log_prob(
-                inp["baf"]
-                )
+            if self.minor[self.x] == self.Major[self.x]:
+                num = (self.purity * self.minor[self.x]) +  (1 - self.purity)
+                den = (self.purity * (self.Major[self.x] + self.minor[self.x])) + (2 * (1 - self.purity))
+                prob = num / den
+                alpha = ((self.snp_dp-2) * prob + 1) / (1 - prob)      
+                baf_lk = dist.Beta(concentration1 = alpha, 
+                                    concentration0 = self.snp_dp).log_prob(
+                    inp["baf"]
+                    )
+                
+            else:
+                tmp_baf_lk = list()
+                num = (self.purity * self.minor[self.x]) +  (1 - self.purity)
+                den = (self.purity * (self.Major[self.x] + self.minor[self.x])) + (2 * (1 - self.purity))
+                prob_minor = num / den
+                prob_Major =  1 - prob_minor
+                
+                for prob in [prob_minor, prob_Major]:
+                
+                    alpha = ((self.snp_dp-2) * prob + 1) / (1 - prob)      
+                    baf_lk = dist.Beta(concentration1 = alpha, 
+                                        concentration0 = self.snp_dp).log_prob(
+                        inp["baf"]
+                        )
+                    tmp_baf_lk.append(baf_lk) 
+            baf_lk = torch.cat(tmp_baf_lk, dim=1)
             
         # DR         
         if self.has_dr:        
