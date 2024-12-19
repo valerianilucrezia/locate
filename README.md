@@ -1,6 +1,7 @@
-# locate
-
+# locate <img src="package_logo.png" align="right" height="160" alt="" /></a>
 A package for segmenting long-reads sequencing data and inferring copy number states.
+
+
 
 ## Installation
 
