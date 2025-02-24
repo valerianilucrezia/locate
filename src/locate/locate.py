@@ -118,7 +118,7 @@ class LOCATE:
 
         self._model.set_params(param_dict)
 
-    def run(self, steps,param_optimizer = {'lr' : 0.05}, e = 0.01, patience = 5, param_loss = None, seed = 3):
+    def run(self, steps,param_optimizer = {'lr' : 0.05}, e = 0.01, patience = 5, param_loss = None, seed = 3, callback=None):
         """ This function runs the inference of non-categorical parameters
 
           This function performs a complete inference cycle for the given tuple(model, optimizer, loss, inference modality).
@@ -178,6 +178,10 @@ class LOCATE:
             elb = loss[step]
 
             old_w, new_w = new_w, retrieve_params()
+            
+            if callback is not None:
+                callback(model, .guide, step)
+            
 
             stop, diff_params = all_stopping_criteria(old_w, new_w, e, step)
             self.params_history.update({step : diff_params})

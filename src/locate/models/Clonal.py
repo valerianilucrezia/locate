@@ -1,24 +1,17 @@
 import itertools
-
 import torch
-import torch.nn as nn
-from torch.distributions import constraints
 
 from locate.models.Model import Model
 from locate.likelihoods import ClonalLikelihood
 from locate.priors.ploidy import PloidyPrior
 from locate.priors.purity import PurityPrior
 
-
 import pyro
 import pyro.distributions as dist
 from pyro import poutine
 from pyro.infer import infer_discrete, config_enumerate
 from pyro.infer.autoguide import AutoDelta, init_to_sample
-from pyro.ops.indexing import Vindex
 from pyro.util import ignore_jit_warnings
-
-import numpy as np
 
 class SqueezableDict(dict):
     """_summary_
@@ -54,16 +47,17 @@ class Clonal(Model):
         _description_
     """
     params = {'jumping_prob' : 1e-2,                                              
-              'init_probs': torch.tensor([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]), 
-              'hidden_dim': 3, 
-              "CUDA" : False, 
-              "prior_ploidy" : 2, 
-              "prior_purity" : 0.9, 
-              "fix_purity" : True, 
-              "fix_ploidy" : True, 
-              "scaling_factors" : torch.tensor([1.,1.,1.]),
-              "allele_specific": True,
-              "prior_bp": None}
+            'init_probs': torch.tensor([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]), 
+            'hidden_dim': 3, 
+            "CUDA" : False, 
+            "prior_ploidy" : 2, 
+            "prior_purity" : 0.9, 
+            "fix_purity" : True, 
+            "fix_ploidy" : True, 
+            "scaling_factors" : torch.tensor([1.,1.,1.]),
+            "allele_specific": True,
+            "prior_bp": None,
+            "sample_type": "cell_line"}
     
     # This has to be generalized and left empty 
     data_name = set(['baf', 'dr', 'dp_snp', 'vaf', 'dp'])
@@ -112,40 +106,32 @@ class Clonal(Model):
         has_dr = self._data["dr"] is not None
         dp = self._data.get('dp', None)
 
-        purity = self._params["prior_purity"] if self._params["fix_purity"] else PurityPrior().sample() 
-        ploidy = self._params["prior_ploidy"] if self._params["fix_ploidy"] else PloidyPrior().sample()
+        purity = self._params["prior_purity"] if self._params["fix_purity"] else PurityPrior(self._params["sample_type"]).sample() 
+        ploidy = self._params["prior_ploidy"] if self._params["fix_ploidy"] else PloidyPrior(self._params["sample_type"]).sample()
         mean_cov = torch.mean(self._data["dp_snp"].float()) if self._data["dp_snp"] is not None else None
         
-        measures = [i for i in list(self._data.keys()) if self._data[i] != None]
+        measures = [i for i in list(self._data.keys()) if self._data[i] is not None]
         length, n_sequences  = self._data[measures[0]].shape
         
         
         with pyro.plate("sequences", n_sequences):
             init_logits = self._params["init_probs"].log()
-            
-            #if self._params["prior_bp"] != None:
-                #print('here')
-            #    trans_logits = modify_trans_logits(probs_x, self._params["prior_bp"], n_sequences, len(tot))
-                
-            #else:
-            #print(probs_x)
             trans_logits = probs_x.log()
-            #print(trans_logits)
             
             with ignore_jit_warnings():
                 obs_dist = ClonalLikelihood(
-                 x = x.unsqueeze(-1),
-                 Major = Major,
-                 minor = minor,
-                 tot = tot,
-                 snp_dp = mean_cov,
-                 dp = dp, 
-                 scaling_factors = self._params["scaling_factors"],
-                 purity = purity, 
-                 ploidy = ploidy,
-                 batch_shape = [x.shape[0], length],
-                 has_baf = has_baf,
-                 has_dr = has_dr
+                x = x.unsqueeze(-1),
+                Major = Major,
+                minor = minor,
+                tot = tot,
+                snp_dp = mean_cov,
+                dp = dp, 
+                scaling_factors = self._params["scaling_factors"],
+                purity = purity, 
+                ploidy = ploidy,
+                batch_shape = [x.shape[0], length],
+                has_baf = has_baf,
+                has_dr = has_dr
                 ).to_event(1)
 
                 hmm_dist = dist.DiscreteHMM(init_logits, trans_logits, obs_dist)
@@ -158,7 +144,7 @@ class Clonal(Model):
                                 hide=['mixture_idx', 'mixture_idx_purity']#, 
                                 #hide_fn=lambda msg: msg["name"].startswith("x")
                                 ), 
-                         init_loc_fn = self.my_init_fn)
+                        init_loc_fn = self.my_init_fn)
 
     def my_init_fn(self, site):
         _, _, _, x = self.get_Major_minor()
@@ -238,7 +224,7 @@ class Clonal(Model):
                     
                     baf_orientation2 = ((purity * Major[x_new]) + (1 - purity)) / \
                                      ((purity * (Major[x_new] + minor[x_new])) + (2 * (1 - purity)))
-                                     
+                            
                     alpha1 = ((self._data["dp_snp"][t,:]-2) * baf_orientation1 + 1) / (1 - baf_orientation1)
                     alpha2 = ((self._data["dp_snp"][t,:]-2) * baf_orientation2 + 1) / (1 - baf_orientation2)
                     
@@ -247,11 +233,9 @@ class Clonal(Model):
                     log_prob2 = dist.Beta(concentration1=alpha2, 
                                         concentration0=self._data["dp_snp"][t,:]).log_prob(self._data["baf"][t,:])
                     
-                    b_lk = pyro.factor("y_baf_{}".format(t), 
-                                     torch.maximum(log_prob1, log_prob2))
+                    b_lk = pyro.factor("y_baf_{}".format(t), torch.maximum(log_prob1, log_prob2))
                 
                     
-                                           
                 if self._data["dr"] is not None:     
                     dr = ((2 * (1-purity)) + (purity * (Major[x_new] + minor[x_new]))) / (2*(1-purity) + (purity * ploidy))
                     dr_lk = pyro.factor("y_dr_{}".format(t), 
@@ -266,47 +250,12 @@ class Clonal(Model):
                     for j,cn in enumerate(clonal_peaks):
                         for i,p in enumerate(cn):
                             bin_lk = pyro.factor(f"y_vaf_{t}_{i}_{j}", 
-                                                 dist.Binomial(self._data["dp"][t,:], p).log_prob(
-                                                     self._data["vaf"][t,:].to(torch.int64)))
+                                                dist.Binomial(self._data["dp"][t,:], p).log_prob(
+                                                    self._data["vaf"][t,:].to(torch.int64)))
                     
             return x
         
         
-# def modify_trans_logits(probs_x, prior_cp_prob, n_sequences, n_states):
-#     """
-#     Modify the transition probabilities to account for change point prior.
-    
-#     Parameters:
-#     probs_x: torch.Tensor
-#         The base transition probabilities of shape (n_states, n_states).
-#     prior_cp_prob: torch.Tensor
-#         Prior probabilities of change points at each time step of shape (length - 1,).
-#     n_sequences: int
-#         Number of time steps.
-#     n_states: int
-#         Number of hidden states.
-    
-#     Returns:
-#     trans_logits: torch.Tensor
-#         Transition logits modified to account for change points, of shape (length, n_states, n_states).
-#     """
-#     # Create a transition matrix of shape (length, n_states, n_states)
-#     trans_logits = torch.zeros(n_sequences, n_states, n_states)
- 
-#     # Modify the transition matrix for each time step based on prior_cp_prob
-#     for t in range(n_sequences):
-#         for i in range(n_states):
-#             for j in range(n_states):
-#                 if i == j:
-#                     # Logits for staying in the same state: log(1 - prior_cp_prob[t])
-#                     trans_logits[t, i, j] = torch.log(torch.tensor(1.0 - prior_cp_prob[t-1])) if t > 0 else torch.log(probs_x[i, j])
-#                 else:
-#                     # Logits for transitioning to a different state: log(prior_cp_prob[t] / (n_states - 1))
-#                     trans_logits[t, i, j] = torch.log(prior_cp_prob[t-1] / (n_states - 1)) if t > 0 else torch.log(probs_x[i, j])
-    
-#     return trans_logits
-
-            
 
 def get_clonal_peaks(tot, Major, minor, purity):
     """_summary_

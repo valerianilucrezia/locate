@@ -2,17 +2,13 @@ import torch
 import pyro
 import pyro.distributions as dist
 
-import torch
-import pyro
-import pyro.distributions as dist
-
 class PloidyPrior:
     def __init__(self, sample_type="cell_line"):
         """
         Implements a flexible ploidy distribution for different sample types.
         
         Parameters:
-        sample_type: str, one of "cell_line", "tumor", or "normal"
+        sample_type: str, one of "cell_line", "clinical"
         """
         self.sample_type = sample_type
         
@@ -23,17 +19,12 @@ class PloidyPrior:
             # Increasing variance for higher ploidies
             self.sigmas = torch.tensor([0.15, 0.2, 0.25, 0.3])
             
-        elif sample_type == "tumor":
+        elif sample_type == "clinical":
             # More conservative mixture for primary tumors
             self.weights = torch.tensor([0.4, 0.3, 0.2, 0.1])
             self.mus = torch.tensor([2.0, 3.0, 4.0, 5.0])
             self.sigmas = torch.tensor([0.15, 0.2, 0.25, 0.3])
             
-        else:  # normal
-            # Strong prior on diploid
-            self.weights = torch.tensor([0.95, 0.05])
-            self.mus = torch.tensor([2.0, 2.0])
-            self.sigmas = torch.tensor([0.1, 0.2])
             
         # Normalize weights
         self.weights = self.weights / self.weights.sum()
