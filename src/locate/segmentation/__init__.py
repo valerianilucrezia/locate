@@ -1,2 +1,0 @@
-from locate.segmentation.multivariate_clasp import MultivariateClaSP
-from locate.segmentation.multivariate_segmentation import MultivariateClaSPSegmentation
