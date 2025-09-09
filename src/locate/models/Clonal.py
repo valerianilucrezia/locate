@@ -14,7 +14,7 @@ from pyro.infer.autoguide import AutoDelta, init_to_sample
 from pyro.util import ignore_jit_warnings
 
 from torch.nn.functional import softmax
-from torch.nn.functional import softplus
+
 
 class SqueezableDict(dict):
     """_summary_
@@ -122,9 +122,6 @@ class Clonal(Model):
         for t in range(Tm1):
             L[t] = L[t] + float(prior_bp[t]) * strength * M
         return L
-
-    
-
             
     def model(self, i = 1,  *args, **kwargs):
         """_summary_
@@ -341,8 +338,6 @@ class Clonal(Model):
                                                     self._data["vaf"][t,:].to(torch.int64)))
                     
             return x
-        
-        
 
 def get_clonal_peaks(tot, Major, minor, purity):
     """_summary_

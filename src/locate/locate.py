@@ -218,7 +218,6 @@ class LOCATE:
         self._loss_trained = loss
         return loss, num_observations
 
-
     def learned_parameters_Clonal(self):
         """_summary_
 
@@ -246,6 +245,7 @@ class LOCATE:
 
         all_params =  {**trained_params_dict, **discrete_params}
         return all_params
+
 
 
     def learned_parameters_SubClonal(self):
