@@ -30,6 +30,7 @@ def run_segmentation(base, md = 'sum', thr = 1e-10, wsize = 50):
                                    cna_id = None,
                                    frequencies = ['baf', 'dr'])
     multiClasp.analyze_time_series()
+    print('inferred breakpoints =', multiClasp.all_cps)
     np.save(f'{base}/{md}_{wsize}_{thr}.npy', multiClasp.all_cps)
     return 
 
@@ -40,9 +41,9 @@ if __name__ == '__main__':
     parser.add_argument("-b", "--base", type=str, help="base", default = "")
     parser.add_argument("-s", "--sim", type=str, help="sample", default = "sim_21")
     
-    parser.add_argument("-m", "--mode", type=str, help="mode", default = "sum")
-    parser.add_argument("-w", "--windsize", type=int, help="window size", default = 50)
-    parser.add_argument("-t", "--thr", type=float, help="thr", default = 1e-10)    
+    parser.add_argument("-m", "--mode", type=str, help="mode", default = "max")
+    parser.add_argument("-w", "--windsize", type=int, help="window size", default = 5)
+    parser.add_argument("-t", "--thr", type=float, help="thr", default = 1e-15)    
 
     args = parser.parse_args()
     
