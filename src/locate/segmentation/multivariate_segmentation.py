@@ -39,9 +39,9 @@ class MultivariateClaSPSegmentation(ClaSP):
         _description_
     """    
     
-    def __init__(self, n_segments: str|int="learn",
+    def __init__(self, n_segments="learn",
                  n_estimators: int=10, 
-                 window_size: str|int=10, 
+                 window_size=10, 
                  k_neighbours: int=3, 
                  distance: str="euclidean_distance", 
                  score: str="roc_auc", 
