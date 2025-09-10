@@ -227,6 +227,134 @@ def score_cn_predictions(
     }
 
 
+def segment_allele_specific_cn(df, pos_col="pos",
+                               major_col="CN_Major", minor_col="CN_minor"):
+    df = df.sort_values(pos_col).reset_index(drop=True)
+    change = ((df[major_col] != df[major_col].shift()) |
+              (df[minor_col] != df[minor_col].shift()))
+    seg_id = change.cumsum()
+    segs = (df.groupby(seg_id)
+              .agg(seg_start=(pos_col, "min"),
+                   seg_end=(pos_col, "max"),
+                   CN_major=(major_col, "first"),
+                   CN_minor=(minor_col, "first"),
+                   n_bins=(pos_col, "size"))
+              .reset_index(drop=True))
+    segs["length"] = segs["seg_end"] - segs["seg_start"] + 1
+    segs["seg_id"] = np.arange(len(segs))
+    return segs[["seg_id","seg_start","seg_end","length","n_bins","CN_major","CN_minor"]]
+
+def _l1_dist(a_major, a_minor, b_major, b_minor):
+    return abs(a_major - b_major) + abs(a_minor - b_minor)
+
+def coalesce_same_cn(segs):
+    """
+    Merge consecutive segments that share the same (CN_major, CN_minor).
+    Treat segments as mergeable if they are touching or overlapping.
+    """
+    if len(segs) <= 1:
+        return segs.copy()
+
+    s = segs.sort_values("seg_start").reset_index(drop=True).copy()
+    out = []
+    cur = s.iloc[0].to_dict()
+
+    for i in range(1, len(s)):
+        row = s.iloc[i]
+        same_state = (row["CN_major"] == cur["CN_major"]) and (row["CN_minor"] == cur["CN_minor"])
+        touching = row["seg_start"] <= cur["seg_end"] + 1  # contiguous or overlap
+        if same_state and touching:
+            # extend current
+            cur["seg_end"] = max(cur["seg_end"], int(row["seg_end"]))
+            cur["length"]  = cur["seg_end"] - cur["seg_start"] + 1
+            cur["n_bins"]  = int(cur["n_bins"]) + int(row["n_bins"])
+        else:
+            out.append(cur)
+            cur = row.to_dict()
+    out.append(cur)
+
+    out = pd.DataFrame(out).reset_index(drop=True)
+    out["seg_id"] = np.arange(len(out))
+    return out[["seg_id","seg_start","seg_end","length","n_bins","CN_major","CN_minor"]]
+
+
+def merge_micro_segments(segs, min_bins=5, max_passes=100):
+    """
+    Merge segments shorter than min_bins into neighbors; after each pass,
+    coalesce any newly adjacent equal-CN segments.
+    """
+    s = segs.sort_values("seg_start").reset_index(drop=True).copy()
+
+    def _merge_once(s):
+        if len(s) <= 1:
+            return s, False
+        short_idx = s.index[s["n_bins"] < min_bins].tolist()
+        if not short_idx:
+            return s, False
+
+        to_drop = []
+        for i in short_idx:
+            if i in to_drop or i >= len(s):
+                continue
+            left = i - 1 if i - 1 >= 0 else None
+            right = i + 1 if i + 1 < len(s) else None
+            if left is None and right is None:
+                continue
+
+            target = None
+            # Prefer identical state neighbor
+            if left is not None and \
+               (s.loc[left, "CN_major"] == s.loc[i, "CN_major"]) and \
+               (s.loc[left, "CN_minor"] == s.loc[i, "CN_minor"]):
+                target = left
+            if right is not None and \
+               (s.loc[right, "CN_major"] == s.loc[i, "CN_major"]) and \
+               (s.loc[right, "CN_minor"] == s.loc[i, "CN_minor"]):
+                if target is None or s.loc[right, "length"] > s.loc[target, "length"]:
+                    target = right
+
+            # Else closest L1 distance, tie -> larger length, tie -> left
+            if target is None:
+                candidates = []
+                if left is not None:
+                    dL = _l1_dist(s.loc[i,"CN_major"], s.loc[i,"CN_minor"],
+                                  s.loc[left,"CN_major"], s.loc[left,"CN_minor"])
+                    candidates.append(("L", left, dL, s.loc[left,"length"]))
+                if right is not None:
+                    dR = _l1_dist(s.loc[i,"CN_major"], s.loc[i,"CN_minor"],
+                                  s.loc[right,"CN_major"], s.loc[right,"CN_minor"])
+                    candidates.append(("R", right, dR, s.loc[right,"length"]))
+                candidates.sort(key=lambda x: (x[2], -x[3], x[0]))
+                target = candidates[0][1]
+
+            # Merge i into target
+            new_start = min(s.loc[i, "seg_start"], s.loc[target, "seg_start"])
+            new_end   = max(s.loc[i, "seg_end"],   s.loc[target, "seg_end"])
+            s.loc[target, "seg_start"] = new_start
+            s.loc[target, "seg_end"]   = new_end
+            s.loc[target, "length"]    = new_end - new_start + 1
+            s.loc[target, "n_bins"]    = s.loc[target, "n_bins"] + s.loc[i, "n_bins"]
+            to_drop.append(i)
+
+        if not to_drop:
+            return s, False
+
+        s = s.drop(index=to_drop).sort_values("seg_start").reset_index(drop=True)
+        # Coalesce equal-CN neighbors formed by this pass
+        s = coalesce_same_cn(s)
+        return s, True
+
+    changed = True
+    passes = 0
+    while changed and passes < max_passes:
+        s, changed = _merge_once(s)
+        passes += 1
+
+    # Final coalesce in case last pass only touched boundaries
+    s = coalesce_same_cn(s)
+    return s
+
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -282,6 +410,12 @@ if __name__ == '__main__':
         out_df['summary'].to_csv(f'{out_dir}/summary.csv', header=True, index=False)
         out_df['per_class_total'].to_csv(f'{out_dir}/summary_per_class_total.csv', header=True, index=False)
         out_df['per_class_pair'].to_csv(f'{out_dir}/summary_per_class_pair.csv', header=True, index=False)
+        
+        bins = 10
+        segments = segment_allele_specific_cn(res)
+        segs_merged = merge_micro_segments(segments, min_bins=bins)
+        segments.to_csv(f'{out_dir}/segments.csv', header=True, index=False)
+        segs_merged.to_csv(f'{out_dir}/merged_segments_{bins}.csv', header=True, index=False)
         
     
     
