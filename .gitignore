@@ -139,5 +139,10 @@ dmypy.json
 **.Rhistory
 **.out
 
+**out**
+**log**
+**data_info**
+**rds**
+
 # MacOS
 .DS_Store

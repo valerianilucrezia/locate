@@ -376,9 +376,8 @@ if __name__ == '__main__':
         ploidy, _ = estimate_ploidy(data, return_details=True)
         
         fix_ploidy = eval(args.ploidy)
-        print(fix_ploidy)
-        vaf = args.vaf
-        bps = args.bps
+        vaf = eval(args.vaf)
+        bps = eval(args.bps)
         
         if not bps:
             prior_bps = None

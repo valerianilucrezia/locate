@@ -21,3 +21,5 @@ export PATH="/orfeo/scratch/area/lvaleriani/myconda/envs/locate/bin:/orfeo/scrat
 
 python infer_ProCESS.py  -b /orfeo/scratch/area/lvaleriani/utils_locate/simulations_rRACES/test_dr/out/clonal -s sim_${sim} 
 python infer_ProCESS.py  -b /orfeo/scratch/area/lvaleriani/utils_locate/simulations_rRACES/test_dr/out/clonal -s sim_${sim} -p False
+python infer_ProCESS.py  -b /orfeo/scratch/area/lvaleriani/utils_locate/simulations_rRACES/test_dr/out/clonal -s sim_${sim} -p False -v True
+python infer_ProCESS.py  -b /orfeo/scratch/area/lvaleriani/utils_locate/simulations_rRACES/test_dr/out/clonal -s sim_${sim} -v True
