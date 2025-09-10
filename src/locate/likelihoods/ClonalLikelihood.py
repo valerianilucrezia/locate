@@ -30,7 +30,8 @@ class ClonalLikelihood(TorchDistribution):
                  batch_shape = None,
                  validate_args = False,
                  has_baf = True,
-                 has_dr = True):
+                 has_dr = True,
+                 vaf = None):
 
         self.x = x
         self.Major = Major
@@ -44,6 +45,7 @@ class ClonalLikelihood(TorchDistribution):
         self.validate_args = validate_args
         self.has_baf = has_baf
         self.has_dr = has_dr
+        self.vaf = vaf
         
         
         batch_shape = torch.Size(batch_shape)
@@ -84,7 +86,7 @@ class ClonalLikelihood(TorchDistribution):
                 )
         
         # VAF
-        if self.dp != None and self.vaf != None:
+        if self.dp is not None and self.vaf is not None:
             clonal_peaks = get_clonal_peaks(self.tot[self.x], self.Major[self.x], self.minor[self.x], self.purity)
             
             tmp_vaf_lk = []
