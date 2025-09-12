@@ -159,9 +159,14 @@ class Clonal(Model):
         has_baf = self._data["baf"] is not None
         has_dr = self._data["dr"] is not None
         dp = self._data.get('dp', None)
-
-        purity = self._params["prior_purity"] if self._params["fix_purity"] else PurityPrior(self._params["sample_type"]).sample() 
-        ploidy = self._params["prior_ploidy"] if self._params["fix_ploidy"] else PloidyPrior(self._params["sample_type"]).sample()
+        
+        if self._params["fix_purity"] and self._params["prior_purity"] is not None:
+            purity_prior = PurityPrior(sample_type=self._params["sample_type"], estimate=self._params["prior_purity"], variance=0.05) 
+        if self._params["fix_ploidy"] and self._params["prior_ploidy"] is not None:
+            ploidy_prior = PloidyPrior(sample_type=self._params["sample_type"], estimate=self._params["prior_ploidy"], variance=0.15**2, family="gamma")
+        
+        purity = purity_prior.sample() if self._params["fix_purity"] else PurityPrior(self._params["sample_type"]).sample() 
+        ploidy = ploidy_prior.sample() if self._params["fix_ploidy"] else PloidyPrior(self._params["sample_type"]).sample()
         mean_cov = torch.mean(self._data["dp_snp"].float()) if self._data["dp_snp"] is not None else None
         
         measures = [i for i in list(self._data.keys()) if self._data[i] is not None]
@@ -212,7 +217,7 @@ class Clonal(Model):
     def guide(self, *args, **kwargs):
         return AutoDelta(model = poutine.block(
                                 self.model, 
-                                hide=['mixture_idx', 'mixture_idx_purity']
+                                hide=['mixture_idx', 'mixture_idx_purity', 'mixture_idx_ploidy']
                                 ), 
                         init_loc_fn = self.my_init_fn)
 

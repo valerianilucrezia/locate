@@ -161,7 +161,7 @@ class LOCATE:
         # NEW: choose guide
         if guide_kind == "normal":
             # Use a flexible guide to get posterior uncertainty
-            guide = AutoNormal(model = poutine.block(model,  hide=['mixture_idx', 'mixture_idx_purity']), init_loc_fn=getattr(self._model, "my_init_fn", init_to_sample))
+            guide = AutoNormal(model = poutine.block(model,  hide=['mixture_idx', 'mixture_idx_purity', 'mixture_idx_ploidy']), init_loc_fn=getattr(self._model, "my_init_fn", init_to_sample))
         else:
             # default: your existing AutoDelta guide
             guide = self._model.guide(None)
