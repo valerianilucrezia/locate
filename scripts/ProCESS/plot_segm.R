@@ -1,6 +1,6 @@
 library(tidyverse)
 base = '/orfeo/scratch/area/lvaleriani/utils_locate/simulations_rRACES/test_dr/out/clonal'
-sims = paste0('sim_', 1:30)
+sims = paste0('sim_', 1:60)
 
 tol = 10
 w_size = 5

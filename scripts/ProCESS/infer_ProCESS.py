@@ -56,7 +56,7 @@ def run_hmm(data_input,
                                 "dr":data_input["dr"], 
                                 "dp_snp":data_input["dp_snp"], 
                                 "vaf": data_input["vaf"], 
-                                "dp": data_input["dp"]})
+                                "dp": data_input["dp_snv"]})
     else:
         locate.initialize_model({"baf":data_input["baf"],
                                 "dr":data_input["dr"], 
@@ -362,8 +362,8 @@ if __name__ == '__main__':
     parser.add_argument("-s", "--sim", type=str, help="sample", default = "sim_21")
     
     parser.add_argument("-p", "--ploidy", type=str, help="ploidy", default = "True")
-    parser.add_argument("-v", "--vaf", type=bool, help="vaf", default = False)  
-    parser.add_argument("-B", "--bps", type=bool, help="breakpoint", default = False)  
+    parser.add_argument("-v", "--vaf", type=str, help="vaf", default = "False")  
+    parser.add_argument("-B", "--bps", type=str, help="breakpoint", default = "False")  
 
     args = parser.parse_args()
     

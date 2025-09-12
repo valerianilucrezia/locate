@@ -33,15 +33,6 @@ def run_segmentation(base, md = 'sum', thr = 1e-10, wsize = 50):
     np.save(f'{base}/{md}_{wsize}_{thr}.npy', multiClasp.all_cps)
     return multiClasp.all_cps
 
-#!/usr/bin/env python
-
-import pandas as pd
-import torch
-import numpy as np
-
-import argparse
-import os
-
 
 
 def coalesce_equal_cn(df):
@@ -218,6 +209,7 @@ if __name__ == '__main__':
         df_true = pd.read_csv(sim_dir+'/'+comb + "/mirr_smooth_bps.csv", sep = ',', on_bad_lines='skip') 
         
         # Run evaluation
-        metrics = evaluate_segmentation(f'{args.sim}_{comb}_{args.mode}_{args.windsize}_{args.thr}', df_true, pred_bps, tolerance=10)
-        metrics.to_csv(path_or_buf=f'{sim_dir}/{comb}/bp_metrics_{args.tol}_{args.mode}_{args.windsize}_{args.thr}.csv', sep=",")
+        tolerance = 10
+        metrics = evaluate_segmentation(f'{args.sim}_{comb}_{args.mode}_{args.windsize}_{args.thr}', df_true, pred_bps, tolerance=tolerance)
+        metrics.to_csv(path_or_buf=f'{sim_dir}/{comb}/bp_metrics_{tolerance}_{args.mode}_{args.windsize}_{args.thr}.csv', sep=",")
 
