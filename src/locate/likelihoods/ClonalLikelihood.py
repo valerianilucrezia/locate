@@ -24,7 +24,7 @@ class ClonalLikelihood(TorchDistribution):
                  tot = None,
                  snp_dp = None,
                  dp = None,
-                 scaling_factors = torch.tensor([1.,1.,1.,1.]),
+                 scaling_factors = [1.,1.,1.,1.],
                  purity = 1, 
                  ploidy = 2,
                  batch_shape = None,
@@ -32,21 +32,22 @@ class ClonalLikelihood(TorchDistribution):
                  has_baf = True,
                  has_dr = True,
                  vaf = None):
-
-        self.x = x
-        self.Major = Major
-        self.minor = minor
-        self.tot = tot
-        self.scaling_factors = scaling_factors
-        self.purity = purity
-        self.ploidy = ploidy
-        self.snp_dp = snp_dp
-        self.dp = dp
+        
+        self.device = x.device if x is not None else 'cpu'
+        self.x = x.to(self.device) if x is not None else None
+        self.Major = Major.to(self.device) if Major is not None else None
+        self.minor = minor.to(self.device) if minor is not None else None
+        self.tot = tot.to(self.device) if tot is not None else None
+        self.scaling_factors = torch.tensor(scaling_factors).to(self.device)
+        self.purity = purity if isinstance(purity, Number) else purity.to(self.device)
+        self.ploidy = ploidy if isinstance(ploidy, Number) else ploidy.to(self.device)
+        self.snp_dp = snp_dp.to(self.device) if snp_dp is not None else None
+        self.dp = dp.to(self.device) if dp is not None else None
+        self.vaf = vaf.to(self.device) if vaf is not None else None
+        
         self.validate_args = validate_args
         self.has_baf = has_baf
         self.has_dr = has_dr
-        self.vaf = vaf
-        
         
         batch_shape = torch.Size(batch_shape)
         super(ClonalLikelihood, self).__init__(batch_shape, validate_args=validate_args)
@@ -60,6 +61,8 @@ class ClonalLikelihood(TorchDistribution):
         inp : _type_
             _description_
         """
+        
+        inp = {k: v.to(self.device) if torch.is_tensor(v) else v for k, v in inp.items()}
         
         dr_lk = 0
         baf_lk = 0

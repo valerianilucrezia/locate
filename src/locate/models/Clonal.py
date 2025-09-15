@@ -71,15 +71,22 @@ class Clonal(Model):
     data_name = set(['baf', 'dr', 'dp_snp', 'vaf', 'dp'])
 
     def __init__(self, data_dict):
+        # Initialize default parameters
         self._params = self.params.copy()
-        self._data = None
+        
+        # Update with any parameters passed in data_dict
+        if 'params' in data_dict:
+            self._params.update(data_dict['params'])
+        
         self._name = "Clonal"
         super().__init__(data_dict, self.data_name)
         
-        # internal structure is a SqueezableDict
+        # Convert data to SqueezableDict after parent initialization
         self._data = SqueezableDict({k:v for k,v in self._data.items()})
         
-
+        # Ensure device is set
+        self.device = torch.device('cuda' if self._params.get("CUDA", False) else 'cpu')
+            
     def _diploid_index(self, Major, minor):
         if Major is None or minor is None:
             return None
@@ -94,10 +101,10 @@ class Clonal(Model):
         self_boost = float(self._params["alpha_self_boost"])
         dip_boost  = float(self._params["alpha_dip_boost"])
 
-        tot = tot.float()                               # (K,)
+        tot = tot.float().to(self.device)                        # (K,)
         dcn = torch.cdist(tot.unsqueeze(1), tot.unsqueeze(1), p=1).squeeze(-1)  # (K,K)
         kernel = torch.exp(-lam * dcn)                  # penalize big ΔCN
-        kernel = kernel + torch.eye(K) * self_boost     # sticky diagonal
+        kernel = kernel + torch.eye(K, device=self.device) * self_boost     # sticky diagonal
 
         if dip_idx is not None and dip_boost > 0:
             kernel[:, dip_idx] = kernel[:, dip_idx] + dip_boost
@@ -113,7 +120,7 @@ class Clonal(Model):
         Return (T-1,K,K) logits that encourage switches at high prior_bp[t].
         """
         K = base_logits.size(0)
-        eye = torch.eye(K, device=base_logits.device)
+        eye = torch.eye(K, device=self.device)
         off = (1 - eye) / (K - 1)
         # mask with zero row-sum so overall scale stays reasonable:
         M = off - eye
@@ -135,25 +142,19 @@ class Clonal(Model):
         n_sequences, length = 0, 0
         tot = 0
         
+
+        x = torch.arange(0, self._params["hidden_dim"], device=self.device).long()
         if self._params["allele_specific"]:
             Major, minor, tot, x = self.get_Major_minor()
             self._params["Major"] = Major
             self._params["minor"] = minor
             K = x.shape[0]
-            # probs_x = pyro.sample(
-            #     "probs_x",
-            #     dist.Dirichlet((1 - self._params["jumping_prob"]) * torch.eye(x.shape[0]) + self._params["jumping_prob"]).to_event(1),
-            # )
             
         else:
-            # probs_x = pyro.sample(
-            #     "probs_x",
-            #     dist.Dirichlet((1 - self._params["jumping_prob"]) * torch.eye(self._params["hidden_dim"]) + self._params["jumping_prob"]).to_event(1),
-            # )
-            x = torch.arange(0, self._params["hidden_dim"]).long()
+            #x = torch.arange(0, self._params["hidden_dim"]).long()
+            x = torch.arange(0, self._params["hidden_dim"], device=self.device).long()
             tot = x + 1
             minor, Major = None, None
-            #K = self._params["hidden_dim"]
             K = x.shape[0]
             
         has_baf = self._data["baf"] is not None
@@ -180,7 +181,6 @@ class Clonal(Model):
 
         prior_bp = self._params.get("prior_bp", None)
         if prior_bp is not None:
-            #assert prior_bp.numel() == (length - 1), "prior_bp must have length T-1"
             trans_logits = self._apply_breakpoint_prior(
                 base_logits,
                 prior_bp=prior_bp,
@@ -191,9 +191,7 @@ class Clonal(Model):
         init_logits = self._params["init_probs"].log()
         
         with pyro.plate("sequences", n_sequences):
-            #init_logits = self._params["init_probs"].log()
-            #trans_logits = probs_x.log()
-            
+
             with ignore_jit_warnings():
                 obs_dist = ClonalLikelihood(
                 x = x.unsqueeze(-1),
@@ -246,132 +244,134 @@ class Clonal(Model):
         major_alleles = [max(combination) for combination in combinations]
         minor_alleles = [min(combination) for combination in combinations]
 
-        major_allele_tensor = torch.tensor(major_alleles).long()
-        minor_allele_tensor = torch.tensor(minor_alleles).long()
-        x = torch.tensor(list(range(len(major_alleles)))).long()
+        major_allele_tensor = torch.tensor(major_alleles, device=self.device).long()
+        minor_allele_tensor = torch.tensor(minor_alleles, device=self.device).long()
+        x = torch.tensor(list(range(len(major_alleles))), device=self.device).long()
         tot = major_allele_tensor + minor_allele_tensor
 
         return major_allele_tensor, minor_allele_tensor, tot,  x
     
-    
-    # Model 2 is the same as model 1 but with enumeration, 
-    # is it used to get MAP estimates of the states
     @infer_discrete(first_available_dim = -2, temperature=0)
     @config_enumerate
     def model_2(self, learned_params):
-        """_summary_
-
-        Parameters
-        ----------
-        learned_params : _type_
-            _description_
-
-        Returns
-        -------
-        _type_
-            _description_
-        """
+        """Sample from the posterior distribution of the HMM states with optimized performance."""
         
-        n_sequences, length = 0, 0
-        minor, Major = None, None
-        x = torch.arange(1., self._params["hidden_dim"] + 1)
-        tot = x
-
+        # Pre-move all data to device at once
+        data_device = {k: v.to(self.device) if v is not None else None 
+                    for k, v in self._data.items()}
+        
+        # Initialize dimensions
+        measures = [i for i, v in data_device.items() if v is not None]
+        length, n_sequences = data_device[measures[0]].shape
+        
+        # Get and move Major/minor data to device once
         if self._params["allele_specific"]:
             Major, minor, tot, x = self.get_Major_minor()
-            
-        #probs_x = learned_params['probs_x']
-        purity = self._params["prior_purity"] if self._params["fix_purity"] else learned_params['purity']
-        ploidy = self._params["prior_ploidy"] if self._params["fix_ploidy"] else learned_params['ploidy']
-            
-        measures = [i for i in list(self._data.keys()) if self._data[i] != None]
-        length, n_sequences  = self._data[measures[0]].shape
+        else:
+            x = torch.arange(1., self._params["hidden_dim"] + 1, device=self.device)
+            tot = x
+            Major = minor = None
+        
         K = x.shape[0]
         
-        # learned transitions
-        base_logits = learned_params['probs_x'].log()   # (K,K)
+        # Pre-compute parameters
+        purity = (self._params["prior_purity"] if self._params["fix_purity"] 
+                else learned_params['purity'].to(self.device))
+        ploidy = (self._params["prior_ploidy"] if self._params["fix_ploidy"] 
+                else learned_params['ploidy'].to(self.device))
+        
+        # Pre-compute transition probabilities
+        base_logits = learned_params['probs_x'].to(self.device).log()
         prior_bp = self._params.get("prior_bp", None)
         if prior_bp is not None:
+            prior_bp = prior_bp.to(self.device)
             trans_logits_T = self._apply_breakpoint_prior(
-                base_logits, prior_bp, float(self._params["bp_strength"])
-            )  # (T-1,K,K)
+                base_logits, prior_bp, float(self._params["bp_strength"]))
         else:
             trans_logits_T = None
             base_probs = softmax(base_logits, dim=-1)
         
-        with pyro.plate("sequences", n_sequences, dim = -1):
+        # Pre-compute common terms for BAF and DR
+        if data_device["baf"] is not None or data_device["dr"] is not None:
+            dp_snp = data_device["dp_snp"]
+            sqrt_dp_snp = torch.sqrt(dp_snp)
+        
+        data_device = {k: v.to(self.device) if torch.is_tensor(v) else v 
+                  for k, v in self._data.items()}
+        
+        with pyro.plate("sequences", n_sequences, dim=-1):
             x = [0]
             
             for t in pyro.markov(range(length)):
+                # Compute transition probabilities
                 if trans_logits_T is None:
                     p_row = base_probs[x[t]]
                 else:
                     p_row = softmax(trans_logits_T[t-1, x[t]] if t > 0 else base_logits[x[t]], dim=-1)
+                
                 x_new = pyro.sample(f"x_{t}", dist.Categorical(p_row))
                 x.append(x_new)
                 
-                if self._data["baf"] is not None:         
-                    num = (purity * minor[x_new]) +  (1 - purity)
-                    den = (purity * (Major[x_new] + minor[x_new])) + (2 * (1 - purity))
+                # BAF likelihood
+                if data_device["baf"] is not None:
+                    major_minor_sum = Major[x_new] + minor[x_new]
+                    num = purity * minor[x_new] + (1 - purity)
+                    den = purity * major_minor_sum + 2 * (1 - purity)
                     prob = num / den
                     
-                    alpha = ((self._data["dp_snp"][t,:]-2) * prob + 1) / (1 - prob)
-                    baf_lk = pyro.factor("y_baf_{}".format(t), 
-                                         dist.Beta(concentration1 = alpha, 
-                                                   concentration0 = self._data["dp_snp"][t,:]).log_prob(
-                                                       self._data["baf"][t,:]
-                                                       ))           
-
-
-                    
-                if self._data["dr"] is not None:     
-                    dr = ((2 * (1-purity)) + (purity * (Major[x_new] + minor[x_new]))) / (2*(1-purity) + (purity * ploidy))
-                    dr_lk = pyro.factor("y_dr_{}".format(t), 
-                                        dist.Gamma(dr * torch.sqrt(self._data["dp_snp"][t,:]) + 1, torch.sqrt(self._data["dp_snp"][t,:])).log_prob(
-                                            self._data["dr"][t,:]))
+                    alpha = ((dp_snp[t] - 2) * prob + 1) / (1 - prob)
+                    pyro.factor("y_baf_{}".format(t), 
+                            dist.Beta(concentration1=alpha, 
+                                    concentration0=dp_snp[t]).log_prob(data_device["baf"][t]))
                 
+                # DR likelihood
+                if data_device["dr"] is not None:
+                    dr = ((2 * (1-purity)) + (purity * major_minor_sum)) / (2*(1-purity) + (purity * ploidy))
+                    pyro.factor("y_dr_{}".format(t), 
+                            dist.Gamma(dr * sqrt_dp_snp[t] + 1, sqrt_dp_snp[t]).log_prob(
+                                data_device["dr"][t]))
                 
-                if "vaf" in self._data.keys() and self._data['vaf'] is not None:
-                    # i could add here pareto stuff
+                # VAF likelihood
+                if data_device.get("vaf") is not None:
                     clonal_peaks = get_clonal_peaks(tot[x_new], Major[x_new], minor[x_new], purity)
-                    
-                    #tmp_vaf_lk = []
-                    for j,cn in enumerate(clonal_peaks):
-                        for i,p in enumerate(cn):
-                            bin_lk = pyro.factor(f"y_vaf_{t}_{i}_{j}", 
-                                                dist.Binomial(self._data["dp"][t,:], p).log_prob(
-                                                    self._data["vaf"][t,:].to(torch.int64)))
-                    
+                    for j, cn in enumerate(clonal_peaks):
+                        for i, p in enumerate(cn):
+                            pyro.factor(f"y_vaf_{t}_{i}_{j}", 
+                                    dist.Binomial(data_device["dp"][t], p).log_prob(
+                                        data_device["vaf"][t].to(torch.int64)))
+            
             return x
 
+
 def get_clonal_peaks(tot, Major, minor, purity):
-    """_summary_
+    """Calculate clonal peaks with proper device handling.
 
     Parameters
     ----------
-    tot : _type_
-        _description_
-    Major : _type_
-        _description_
-    minor : _type_
-        _description_
-    purity : _type_
-        _description_
+    tot : torch.Tensor
+        Total copy number
+    Major : torch.Tensor
+        Major allele copy number
+    minor : torch.Tensor
+        Minor allele copy number
+    purity : torch.Tensor
+        Tumor purity
 
     Returns
     -------
-    _type_
-        _description_
+    list
+        List of clonal peaks
     """
+    # Get device from input tensor
+    device = Major.device
     
     if Major.dim() == 0:
         Major = Major.unsqueeze(0).unsqueeze(1)
         minor = minor.unsqueeze(0).unsqueeze(1)
         tot = tot.unsqueeze(0).unsqueeze(1)
     
-    
     mult = []
-    for i,v in enumerate(Major):
+    for i, v in enumerate(Major):
         m = []
         if torch.equal(Major[i], minor[i]):
             m.append(Major[i][0])
@@ -381,17 +381,20 @@ def get_clonal_peaks(tot, Major, minor, purity):
                 m.append(minor[i][0])
             else:
                 m.append(Major[i][0])
-        if torch.equal(Major[i], torch.tensor([2])) and torch.equal(minor[i], torch.tensor([1])) == False:
-            m.append(torch.tensor(1))
+        # Create tensor on correct device
+        if torch.equal(Major[i], torch.tensor([2], device=device)) and not torch.equal(minor[i], torch.tensor([1], device=device)):
+            m.append(torch.tensor(1, device=device))
         mult.append(m)
 
     clonal_peaks = []
-    for i,c in enumerate(mult):
+    for i, c in enumerate(mult):
         p = []
         for m in c:
+            # Ensure all operations happen on same device
             cp = m * purity / (tot[i] * purity + 2 * (1 - purity))
             p.append(cp)
         clonal_peaks.append(p)
+    
     return clonal_peaks
 
 

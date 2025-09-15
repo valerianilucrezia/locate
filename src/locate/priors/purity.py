@@ -23,8 +23,8 @@ class PurityPrior:
         self,
         sample_type: str = "cell_line",
         *,
-        estimate: float | None = None,
-        variance: float | None = None,
+        estimate= None,
+        variance= None,
     ):
         """
         Tumor purity prior with optional informative Beta(m, v).

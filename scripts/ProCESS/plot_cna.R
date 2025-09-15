@@ -13,6 +13,9 @@ S = c('vaf_True_ploidy_True_bps_False', 'vaf_True_ploidy_False_bps_False')
 
 for (suffix in S){
   print(suffix)
+  tmp <- strsplit(suffix, "_")[[1]]
+  vaf <- tmp[2]
+  
   df <- tibble()
   plt <- list()
   for(sim in sims){
@@ -32,7 +35,9 @@ for (suffix in S){
           tibble() %>% 
           tidyr::separate(sample, sep = '_', into = c('sim_name', 'sim', 'cov_name', 'cov', 'pur_name', 'pur')) %>% 
           select(-sim_name, -cov_name, -pur_name) %>% 
-          mutate(vaf = vaf, ploidy = ploidy, bps = bps, 
+          mutate(vaf = vaf, 
+                 ploidy = ploidy, 
+                 bps = bps, 
                  delta_purity = params$purity - params$inf_purity,
                  delta_ploidy = params$ploidy - params$inf_ploidy,
                  true_ploidy = params$ploidy) 

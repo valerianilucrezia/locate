@@ -38,15 +38,14 @@ def read_data(in_file):
     return data, data_input
 
 def run_hmm(data_input, 
-            gpu = False, 
             nsteps = 100, 
             fix_ploidy = True, 
             vaf = False, 
             ploidy = None,
             bps = None):
-    
+   
+    gpu = torch.cuda.is_available()
     locate = l.LOCATE(CUDA = gpu)
-
     locate.set_model(Clonal)
     locate.set_optimizer(ClippedAdam)
     locate.set_loss(TraceEnum_ELBO)
@@ -55,31 +54,50 @@ def run_hmm(data_input,
         locate.initialize_model({"baf":data_input["baf"],
                                 "dr":data_input["dr"], 
                                 "dp_snp":data_input["dp_snp"], 
-                                "vaf": data_input["vaf"], 
-                                "dp": data_input["dp_snv"]})
+                                "vaf": None, 
+                                "dp": None,
+                                "params": {"CUDA": gpu,
+                                            'jumping_prob' : 1e-2,                                              
+                                            'init_probs': torch.tensor([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]), 
+                                            'hidden_dim': 4, 
+                                            "prior_ploidy" : 2, 
+                                            "prior_purity" : 0.9, 
+                                            "fix_purity" : True, 
+                                            "fix_ploidy" : True, 
+                                            "scaling_factors" : torch.tensor([1.,1.,1.]),
+                                            "allele_specific": True,
+                                            "prior_bp": None,
+                                            "lambda_cn": 1.0,          # ΔCN penalty slope used to shape the prior
+                                            "alpha_conc": 50.0,        # global Dirichlet concentration (higher = stronger prior)
+                                            "alpha_self_boost": 3.0,   # extra mass on the diagonal
+                                            "alpha_dip_boost": 0.5,    # extra mass on diploid column (if present)
+                                            "bp_strength": 3.0, 
+                                            "sample_type": "clinical"}})
     else:
         locate.initialize_model({"baf":data_input["baf"],
                                 "dr":data_input["dr"], 
                                 "dp_snp":data_input["dp_snp"], 
                                 "vaf": None, 
-                                "dp": None})
+                                "dp": None,
+                                "params": {"CUDA": gpu,
+                                            'jumping_prob' : 1e-2,                                              
+                                            'init_probs': torch.tensor([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]), 
+                                            'hidden_dim': 4, 
+                                            "prior_ploidy" : 2, 
+                                            "prior_purity" : 0.9, 
+                                            "fix_purity" : True, 
+                                            "fix_ploidy" : True, 
+                                            "scaling_factors" : torch.tensor([1.,1.,1.]),
+                                            "allele_specific": True,
+                                            "prior_bp": None,
+                                            "lambda_cn": 1.0,          # ΔCN penalty slope used to shape the prior
+                                            "alpha_conc": 50.0,        # global Dirichlet concentration (higher = stronger prior)
+                                            "alpha_self_boost": 3.0,   # extra mass on the diagonal
+                                            "alpha_dip_boost": 0.5,    # extra mass on diploid column (if present)
+                                            "bp_strength": 3.0, 
+                                            "sample_type": "clinical"}})
 
     ploidy = ploidy if ploidy is not None else 0
-    locate.set_model_params({"jumping_prob" : 1e-6,
-                            "fix_purity": False,
-                            "fix_ploidy" : fix_ploidy, 
-                            "prior_purity": 0,
-                            "prior_ploidy": ploidy,
-                            "scaling_factors": [1,1,1],
-                            'hidden_dim': 4,
-                            "prior_bp": bps,
-                            "lambda_cn": 1.0,          # ΔCN penalty slope used to shape the prior
-                            "alpha_conc": 50.0,        # global Dirichlet concentration (higher = stronger prior)
-                            "alpha_self_boost": 3.0,   # extra mass on the diagonal
-                            "alpha_dip_boost": 0.5,    # extra mass on diploid column (if present)
-                            "bp_strength": 3.0,
-                            "sample_type":"clinical"})
-    
     ll = locate.run(steps = nsteps, param_optimizer = {"lr" : 0.05}, guide_kind="normal")
     params = locate.learned_parameters_Clonal()
     return params
@@ -371,8 +389,7 @@ if __name__ == '__main__':
     combinations = [ i for i in os.listdir(sim_dir) if os.path.isdir(sim_dir + '/' + i)]
     
     for comb in combinations:
-        print(comb)
-        data,data_input = read_data(f'{sim_dir}/{comb}/mirr_smooth_snv.csv')
+        data, data_input = read_data(f'{sim_dir}/{comb}/mirr_smooth_snv.csv')
         ploidy, _ = estimate_ploidy(data, return_details=True)
         
         fix_ploidy = eval(args.ploidy)

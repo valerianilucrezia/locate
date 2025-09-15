@@ -19,8 +19,8 @@ def gamma_from_mean_var(mean: torch.Tensor, var: torch.Tensor):
 class PloidyPrior:
     def __init__(self, 
                 sample_type="cell_line",
-                estimate: float | None = None,
-                variance: float | None = None,
+                estimate= None,
+                variance= None,
                 family: str = "gamma"):
         
         """
